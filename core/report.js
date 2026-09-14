@@ -11,9 +11,9 @@
  * exactly this file: "%.0f" is half-to-even in Python, and str(70.0) is "70.0".
  */
 
-import { BAND_LABELS, MODEL_PARAMS } from "./constants.js";
-import { hmFromHours, maxBy, minBy, pyFloatStr, pyFmt, pyStr } from "./py.js";
-import { parseUtc } from "./tz.js";
+import { BAND_LABELS, MODEL_PARAMS } from "./constants.js?v=23";
+import { hmFromHours, maxBy, minBy, pyFloatStr, pyFmt, pyStr } from "./py.js?v=23";
+import { parseUtc } from "./tz.js?v=23";
 
 const CITATIONS = {
   sleep_opportunity: "FAA AC 120-100",

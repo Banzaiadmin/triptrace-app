@@ -11,11 +11,11 @@
  * and therefore works with no signal.
  */
 
-import { ParseError, parseTripBoard } from "./parser.js";
-import { ScoringError, scoreTrace } from "./scorer.js";
-import { buildReport } from "./report.js";
-import { applyRevisions, normalizeRevisions, workloadPoints } from "./revisions.js";
-import { WORKLOAD } from "./constants.js";
+import { ParseError, parseTripBoard } from "./parser.js?v=23";
+import { ScoringError, scoreTrace } from "./scorer.js?v=23";
+import { buildReport } from "./report.js?v=23";
+import { applyRevisions, normalizeRevisions, workloadPoints } from "./revisions.js?v=23";
+import { WORKLOAD } from "./constants.js?v=23";
 import {
   VENDORS,
   WearableError,
@@ -24,7 +24,7 @@ import {
   importSleep as normalizeSleepPayload,
   matchToRestPeriods,
   toActualSleep,
-} from "./wearables.js";
+} from "./wearables.js?v=23";
 
 export const ENGINE = "device";
 export const WEARABLE_VENDORS = VENDORS;
