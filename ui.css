@@ -34,7 +34,7 @@
   --sleep:     #5B8DEF;
   --sleep-dim: #2E4A80;
   --duty:      #46557A;
-  --wocl:      rgba(138, 116, 255, 0.13);
+  --wocl:      rgba(138, 116, 255, 0.10);
 
   --radius:    16px;
   --radius-sm: 11px;
@@ -266,7 +266,8 @@ svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round
 .trace .curve { stroke-width: 2.4; }
 .trace .curve-fill { stroke: none; opacity: 0.16; }
 .trace .minpt { stroke: var(--bg); stroke-width: 2.5; }
-.trace .minlabel { fill: var(--ink); font-size: 10.5px; font-weight: 700; }
+.trace .minlabel { fill: var(--ink); font-size: 10.5px; font-weight: 700;
+  paint-order: stroke; stroke: var(--surface); stroke-width: 3px; }
 .trace .nowline { stroke: var(--brand); stroke-width: 1.6; stroke-dasharray: 3 3; }
 .trace .nowlabel { fill: var(--brand); font-size: 9px; font-weight: 700; letter-spacing: 0.08em; }
 .trace .daymark { fill: var(--dim); font-size: 9px; letter-spacing: 0.06em; }

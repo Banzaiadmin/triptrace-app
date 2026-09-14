@@ -12,9 +12,9 @@
  * Where the pilot is right now is shown by position on the chart, not by a made-up percentage.
  */
 
-import { traceModel, renderTrace, sparkline, bandFor, bandColor, bandVar } from "./trace.js?v=13";
+import { traceModel, renderTrace, sparkline, bandFor, bandColor, bandVar } from "./trace.js?v=14";
 
-const V = "13";
+const V = "14";
 const $ = (id) => document.getElementById(id);
 const LAST_KEY = "triptrace.last";
 const REVISIONS_KEY = "triptrace.revisions";
@@ -166,8 +166,8 @@ function renderTrip() {
   $("statstrip").innerHTML = [
     [hm(p.tafb_hours), "TAFB"],
     [hm(p.total_block_hours), "Block"],
-    [String(p.landings ?? ""), "Landings"],
-    [String(p.duty_days ?? t.duty_periods.length), "Duty days"],
+    [String(p.landings_count ?? ""), "Ldg"],
+    [String(p.duty_days ?? t.duty_periods.length), "Days"],
   ].map(([v, l]) => `<div><div class="sv">${esc(v)}</div><div class="sl">${esc(l)}</div></div>`).join("");
 
   $("duty-list").innerHTML = state.tmodel.duties.map((d) => {
@@ -358,7 +358,7 @@ function renderNow() {
       <div style="margin-top:12px">
         <div class="kv"><span>Route</span><span>${esc(focus.route)}</span></div>
         <div class="kv"><span>Report → release</span><span>${esc(zulu(new Date(focus.report).toISOString()))} → ${esc(zulu(new Date(focus.release).toISOString()))}</span></div>
-        <div class="kv"><span>Modeled at report / low / release</span><span>${pct(focus.startPct)} · ${pct(focus.minPct)} · ${pct(focus.endPct)}</span></div>
+        <div class="kv"><span>At report / low / release</span><span>${pct(focus.startPct)} · ${pct(focus.minPct)} · ${pct(focus.endPct)}</span></div>
       </div>
     </div>`);
   }
@@ -451,10 +451,27 @@ function renderRest() {
         ${measured ? `<span class="flag measured">Measured</span>` : ""}
         ${day ? `<span class="flag day">Daytime</span>` : `<span class="flag night">Overnight</span>`}
         ${lay.at_or_near_floor ? `<span class="flag floor">At the floor</span>` : ""}
-        ${esc(r.assumptions ?? "")}
+        ${esc(restText(r, day, measured, lay))}
       </p>
     </div>`;
   }).join("");
+}
+
+/**
+ * What this layover actually offers, in the pilot's terms. The engine's own `assumptions` string
+ * names the model's efficiency constants, and the app does not disclose those.
+ */
+function restText(r, daytime, measured, lay) {
+  const n = (r.sleep_events ?? []).length;
+  const bits = [];
+  bits.push(n === 0 ? "No usable sleep block fits inside this layover."
+    : n === 1 ? "One consolidated block fits inside the opportunity window."
+    : `${n} separate blocks fit inside the opportunity window, so this rest is split rather than consolidated.`);
+  if (measured) bits.push("Your measured sleep has replaced the model for this layover.");
+  else if (daytime) bits.push("It falls in daylight, against the body clock, and is discounted accordingly.");
+  else bits.push("It sits with the body clock rather than against it, which is why it is worth protecting.");
+  if (lay?.at_or_near_floor) bits.push("The layover is at or near its contractual floor, so there is nothing to give back.");
+  return bits.join(" ");
 }
 
 /** One layover as a hypnogram strip: opportunity window, modeled blocks inside it, WOCL behind. */
@@ -473,8 +490,10 @@ function hypnogram(rest, wocl) {
   }
   parts.push(`<rect class="win" x="${x(s).toFixed(1)}" y="${barY}" width="${(x(e) - x(s)).toFixed(1)}" height="${barH}" rx="6"/>`);
   for (const b of rest.sleep_events ?? []) {
-    const b0 = Date.parse(b.window?.start_utc ?? ""), b1 = Date.parse(b.window?.end_utc ?? "");
-    if (!b0 || !b1 || b1 <= b0) continue;
+    const rawStart = Date.parse(b.window?.start_utc ?? ""), rawEnd = Date.parse(b.window?.end_utc ?? "");
+    if (!rawStart || !rawEnd || rawEnd <= rawStart) continue;
+    const b0 = Math.max(s, rawStart), b1 = Math.min(e, rawEnd);
+    if (b1 <= b0) continue;
     parts.push(`<rect class="blk" x="${x(b0).toFixed(1)}" y="${barY + 3}" width="${Math.max(2, x(b1) - x(b0)).toFixed(1)}" height="${barH - 6}" rx="4"/>`);
   }
   parts.push(`<text x="${x(s).toFixed(1)}" y="${H - 2}" text-anchor="start">${esc(zulu(rest.sleep_opportunity_window.start_utc))}</text>`);

@@ -154,7 +154,7 @@ export function renderTrace(container, model, { scope = "trip", now = Date.now()
   const win = windowFor(model, scope);
   const hours = (win.to - win.from) / HOUR;
   const pxPerHour = win.px ?? Math.max(8, Math.min(15, (width * 2.6) / hours));
-  const PAD_L = 30, PAD_R = 18;
+  const PAD_L = 40, PAD_R = 18;   // the DUTY/REST row labels live here; 30 clipped them
   const W = Math.round(hours * pxPerHour) + PAD_L + PAD_R;
 
   const TOP = 22, CURVE_H = 128;
@@ -241,9 +241,13 @@ export function renderTrace(container, model, { scope = "trip", now = Date.now()
     out.push(`<line class="grid" x1="${x(t).toFixed(1)}" x2="${x(t).toFixed(1)}" y1="${AXIS_Y - 6}" y2="${AXIS_Y - 2}"/>`);
     out.push(`<text class="gridlabel" x="${x(t).toFixed(1)}" y="${AXIS_Y + 8}" text-anchor="middle">${zulu(t)}Z</text>`);
   }
+  let lastDay = null;                 // two duties can report on the same date; label it once
   for (const d of model.duties) {
     if (!d.report || !inWin(d.report)) continue;
-    out.push(`<text class="daymark" x="${x(d.report).toFixed(1)}" y="${AXIS_Y + 22}" text-anchor="middle">${esc(dayName(d.report))}</text>`);
+    const name = dayName(d.report);
+    if (name === lastDay) continue;
+    lastDay = name;
+    out.push(`<text class="daymark" x="${x(d.report).toFixed(1)}" y="${AXIS_Y + 22}" text-anchor="middle">${esc(name)}</text>`);
   }
 
   // The lowest point, called out where it happens.
@@ -253,7 +257,7 @@ export function renderTrace(container, model, { scope = "trip", now = Date.now()
     const anchor = lx > W - 90 ? "end" : "start";
     const dx = anchor === "end" ? -9 : 9;
     out.push(`<circle class="minpt" cx="${lx.toFixed(1)}" cy="${ly.toFixed(1)}" r="5" fill="${bandColor(low.pct)}"/>`);
-    out.push(`<text class="minlabel" x="${(lx + dx).toFixed(1)}" y="${(ly - 10).toFixed(1)}" text-anchor="${anchor}">${low.pct.toFixed(1)}%</text>`);
+    out.push(`<text class="minlabel" x="${(lx + dx).toFixed(1)}" y="${(ly - 13).toFixed(1)}" text-anchor="${anchor}">${low.pct.toFixed(1)}%</text>`);
   }
 
   // Where the pilot is right now.

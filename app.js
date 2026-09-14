@@ -16,7 +16,7 @@ const $ = (id) => document.getElementById(id);
 const LAST_KEY = "triptrace.last";
 const INSTALL_DISMISSED_KEY = "triptrace.install-dismissed";
 // Bump together with ASSET_VERSION in sw.js and the ?v= in index.html.
-const V = "13";
+const V = "14";
 
 // The on-device engine, loaded lazily so a browser that cannot run it still has the service path.
 let engine = null;
