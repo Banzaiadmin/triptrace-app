@@ -390,6 +390,32 @@ details.log .log-state { font-weight: 500; color: var(--red); font-size: 12.5px;
 .summary .notes { font-size: 11.5px; color: var(--sub); line-height: 1.55; }
 .summary .revised { color: var(--red); font-weight: 600; margin-top: 8px; }
 .summary .table-scroll { overflow-x: auto; }
+.summary .tiles { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin: 14px 0; }
+@media (max-width: 560px) { .summary .tiles { grid-template-columns: repeat(3, 1fr); } }
+.summary .tile { background: var(--card); border-radius: 12px; padding: 10px 6px; text-align: center; }
+.summary .tile.alert { background: #FBECEC; }
+.summary .tile .tv { font-size: 18px; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.summary .tile.alert .tv { color: var(--red); }
+.summary .tile .tl { font-size: 10.5px; color: var(--sub); margin-top: 2px; }
+.summary .box { border-radius: 14px; padding: 14px 16px; margin: 14px 0; border-left: 5px solid var(--hair); background: var(--card); }
+.summary .box h3 { font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; margin: 0 0 8px; }
+.summary .box p { margin: 0 0 6px; font-size: 13px; }
+.summary .box .big { font-size: 19px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 6px; }
+.summary .box ul { padding-left: 18px; margin-top: 6px; }
+.summary .box li { font-size: 12.5px; margin-bottom: 4px; }
+.summary .box.event { background: #FBECEC; border-left-color: var(--red); }
+.summary .box.event h3 { color: var(--red); }
+.summary .box.today { background: #EEF1F7; border-left-color: var(--navy); }
+.summary .box.today h3 { color: var(--navy); }
+.summary .box.risky h3 { color: var(--ink); }
+.summary .box.recover { background: #EAF6EE; border-left-color: #2F855A; }
+.summary .box.recover h3 { color: #2F855A; }
+.summary .panels { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 640px) { .summary .panels { grid-template-columns: 1fr; } }
+.summary .panels .box { margin: 6px 0; }
+.summary .kv { display: flex; gap: 10px; font-size: 12.5px; margin-bottom: 4px; }
+.summary .kv span:first-child { color: var(--sub); flex: 0 0 96px; }
+.summary .pchip { display: inline-block; font-weight: 700; padding: 2px 7px; border-radius: 999px; font-size: 12px; }
 
 @media print {
   @page { margin: 14mm; }

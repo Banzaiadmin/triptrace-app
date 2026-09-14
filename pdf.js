@@ -18,12 +18,12 @@ const W_BOLD = [278,333,474,556,556,889,722,238,333,333,389,584,278,333,278,278,
 
 // Non-ASCII the summary uses -> WinAnsi byte.
 const WINANSI = { "–": 0x96, "—": 0x97, "•": 0x95, "·": 0xB7, "’": 0x92, "‘": 0x91, "“": 0x93, "”": 0x94, "…": 0x85, "°": 0xB0, "±": 0xB1, "×": 0xD7, "é": 0xE9 };
-const REPLACE = { "≈": "~", "→": "->", "←": "<-", "≤": "<=", "≥": ">=", " ": " " };
+const REPLACE = { "≈": "~", "→": "->", "←": "<-", "≤": "<=", "≥": ">=", " ": " " };
 const WIDTH_EXTRA = { 0x96: 556, 0x97: 1000, 0x95: 350, 0xB7: 278, 0x92: 222, 0x91: 222, 0x93: 333, 0x94: 333, 0x85: 1000, 0xB0: 400, 0xB1: 584, 0xD7: 584, 0xE9: 556 };
 
 function encode(text) {
   const bytes = [];
-  for (const ch of text.replace(/[≈→←≤≥ ]/g, (c) => REPLACE[c])) {
+  for (const ch of String(text).replace(/[≈→←≤≥ ]/g, (c) => REPLACE[c])) {
     const code = ch.codePointAt(0);
     if (code < 0x80) bytes.push(code);
     else if (WINANSI[ch] !== undefined) bytes.push(WINANSI[ch]);
@@ -82,9 +82,6 @@ export class PdfDocument {
     if (this.y - height < this.bottom) this.newPage();
   }
 
-  fill(color) { this.ops.push(`${hex(color)} rg`); }
-  stroke(color) { this.ops.push(`${hex(color)} RG`); }
-
   rect(x, y, w, h, color) {
     this.ops.push(`${hex(color)} rg ${x.toFixed(2)} ${y.toFixed(2)} ${w.toFixed(2)} ${h.toFixed(2)} re f`);
   }
@@ -113,7 +110,7 @@ export class PdfDocument {
     return lines;
   }
 
-  /** Flow a paragraph down the page, paginating. Returns the height used. */
+  /** Flow a paragraph down the page, paginating. */
   paragraph(str, { size = 10, bold = false, color = "#22304A", x = null, width = null, leading = null, after = 6 } = {}) {
     const left = x ?? this.margin;
     const w = width ?? (this.width - this.margin - left);
@@ -132,6 +129,45 @@ export class PdfDocument {
     this.paragraph(str, { size, bold: true, color, after: 4 });
     this.rule(this.margin, this.y, this.width - this.margin, "#E3E6EC");
     this.y -= 6;
+  }
+
+  /**
+   * A filled panel with a title and pre-wrapped body lines, kept on one page when it fits (a
+   * panel taller than a page flows). `lines` items are strings or {text, size, bold, color}.
+   */
+  panel(title, lines, { fill = "#F6F7F9", accent = "#1B2A4E", x = null, width = null, titleColor = null, titleSize = 10.5 } = {}) {
+    const left = x ?? this.margin;
+    const w = width ?? this.innerWidth;
+    const pad = 12;
+    const items = [];
+    for (const item of lines) {
+      const spec = typeof item === "string" ? { text: item } : item;
+      const size = spec.size ?? 9;
+      for (const l of this.wrap(spec.text, w - 2 * pad - 6, size, Boolean(spec.bold))) {
+        items.push({ text: l, size, bold: Boolean(spec.bold), color: spec.color ?? "#22304A", lh: size * 1.38, gap: 0 });
+      }
+      items[items.length - 1].gap = spec.after ?? 3;
+    }
+    const titleH = titleSize * 1.5;
+    const bodyH = items.reduce((sum, i) => sum + i.lh + i.gap, 0);
+    const height = pad + titleH + bodyH + pad;
+    if (height <= this.height - this.margin - this.bottom) this.ensure(height);
+    const top = this.y;
+    // Fill only what fits on this page; a flowed remainder is drawn plain.
+    const fits = Math.min(height, top - this.bottom);
+    this.rect(left, top - fits, w, fits, fill);
+    this.rect(left, top - fits, 4, fits, accent);
+    let y = top - pad - titleSize;
+    this.text(title, left + pad + 6, y, { size: titleSize, bold: true, color: titleColor ?? accent });
+    y -= titleH - titleSize + 2;
+    for (const i of items) {
+      if (y - i.lh < this.bottom) { this.newPage(); y = this.y; }
+      y -= i.lh;
+      this.text(i.text, left + pad + 6, y, { size: i.size, bold: i.bold, color: i.color });
+      y -= i.gap;
+    }
+    this.y = Math.min(y - pad, top - fits) ;
+    this.y -= 8;
   }
 
   space(h) { this.y -= h; }
@@ -175,11 +211,17 @@ export class PdfDocument {
 }
 
 const BAND_COLORS = { green: "#34C759", yellow: "#FFCC00", orange: "#FF9500", red: "#FF3B30", purple: "#AF52DE" };
+const BAND_FILL = { green: "#E8F8EC", yellow: "#FFF8DB", orange: "#FFF1E0", red: "#FFE9E7", purple: "#F4E9FA" };
 const NAVY = "#1B2A4E";
 const RED = "#A6252F";
 const INK = "#22304A";
 const SUB = "#5C6675";
 const CARD = "#F6F7F9";
+const RED_FILL = "#FBECEC";
+const NAVY_FILL = "#EEF1F7";
+const GREEN_FILL = "#EAF6EE";
+
+const cap = (s) => (s ? s[0].toUpperCase() + s.slice(1) : s);
 
 /** Lay out a summary model as a PDF. Returns a Uint8Array. */
 export function summaryPdf(model) {
@@ -193,35 +235,127 @@ export function summaryPdf(model) {
   });
   const m = doc.margin;
   const right = doc.width - m;
+  const h = model.headline;
 
-  // Masthead
-  doc.rect(0, doc.height - 6, doc.width, 6, NAVY);
-  doc.y -= 10;
-  doc.text("TRIP", m, doc.y, { size: 11, bold: true, color: NAVY });
-  doc.text("TRACE", m + textWidth("TRIP", 11, true), doc.y, { size: 11, bold: true, color: RED });
-  doc.text("FATIGUE SUMMARY", right - textWidth("FATIGUE SUMMARY", 8.5, true), doc.y, { size: 8.5, bold: true, color: SUB });
-  doc.y -= 26;
-  doc.text(model.title, m, doc.y, { size: 20, bold: true, color: NAVY });
+  // Masthead: dark band like the reference, wordmark, title.
+  doc.rect(0, doc.height - 74, doc.width, 74, NAVY);
+  doc.text("TRIP", m, doc.height - 26, { size: 10, bold: true, color: "#FFFFFF" });
+  doc.text("TRACE", m + textWidth("TRIP", 10, true), doc.height - 26, { size: 10, bold: true, color: "#F2B8BD" });
+  const eyebrow = `FATIGUE RISK SUMMARY${h && h.updated ? " — UPDATED" : ""}`;
+  doc.text(eyebrow, right - textWidth(eyebrow, 9, true), doc.height - 26, { size: 9, bold: true, color: "#C9D1E3" });
+  doc.text(model.title, m, doc.height - 48, { size: 18, bold: true, color: "#FFFFFF" });
+  doc.text(model.subtitle, m, doc.height - 63, { size: 9, color: "#C9D1E3" });
+  doc.y = doc.height - 74 - 10;
+  doc.text(model.prepared, m, doc.y - 4, { size: 8, color: SUB });
   doc.y -= 16;
-  doc.text(model.subtitle, m, doc.y, { size: 10, color: SUB });
-  doc.y -= 13;
-  doc.text(model.prepared, m, doc.y, { size: 8.5, color: SUB });
-  doc.y -= 14;
 
-  // Headline box
-  if (model.headline) {
-    const h = 64;
-    const color = BAND_COLORS[model.headline.band] ?? SUB;
-    doc.rect(m, doc.y - h, doc.innerWidth, h, CARD);
-    doc.rect(m, doc.y - h, 6, h, color);
-    const pct = `${Math.round(model.headline.minPct)}%`;
-    doc.text(pct, m + 20, doc.y - 42, { size: 30, bold: true, color: INK });
-    const px = m + 20 + textWidth(pct, 30, true) + 14;
-    doc.text(`${model.headline.bandLabel} band — lowest estimated effectiveness`, px, doc.y - 20, { size: 10.5, bold: true, color });
-    doc.text(`At ${model.headline.where}${model.headline.at ? ` (${model.headline.at})` : ""}`, px, doc.y - 35, { size: 9.5, color: INK });
-    doc.text(`${cap(model.headline.bac)}. ${model.headline.fatigueCallIndicated ? "A fatigue call is professionally defensible at this level." : "Above the fatigue-call threshold."}`,
-      px, doc.y - 49, { size: 9, color: SUB });
-    doc.y -= h + 10;
+  // Tiles
+  const gap = 8;
+  const tileW = (doc.innerWidth - gap * (model.tiles.length - 1)) / model.tiles.length;
+  const tileH = 46;
+  model.tiles.forEach((t, i) => {
+    const x = m + i * (tileW + gap);
+    doc.rect(x, doc.y - tileH, tileW, tileH, t.alert ? RED_FILL : CARD);
+    const color = t.band ? BAND_COLORS[t.band] : (t.alert ? RED : INK);
+    const v = String(t.value);
+    doc.text(v, x + (tileW - textWidth(v, 16, true)) / 2, doc.y - 22, { size: 16, bold: true, color });
+    doc.text(t.label, x + (tileW - textWidth(t.label, 7.5, false)) / 2, doc.y - 37, { size: 7.5, color: SUB });
+  });
+  doc.y -= tileH + 12;
+
+  // Operational events
+  if (model.logged.length) {
+    doc.panel("OPERATIONAL EVENTS LOGGED", [
+      ...model.logged.map((l) => ({ text: `Day ${l.day}: ${l.text}${l.note ? ` — ${l.note}` : ""}`, size: 9.5 })),
+      { text: "Delays are applied to the timeline (legs, release, and the layover that follows). Conditions are workload in the Combined Capacity figure and do not alter the effectiveness estimate.", size: 8, color: SUB },
+    ], { fill: RED_FILL, accent: RED });
+  }
+
+  // Current assessment
+  if (h) {
+    doc.panel(`${h.updated ? "UPDATED CURRENT" : "CURRENT"} FATIGUE ASSESSMENT`, [
+      { text: `Trip minimum effectiveness: ${Math.round(h.minPct)}% — ${h.bandLabel}`, size: 15, bold: true, color: BAND_COLORS[h.band] ?? INK, after: 4 },
+      { text: `At ${h.where}${h.at ? ` (${h.at})` : ""}. ${cap(h.bac)}. ${h.fatigueCallIndicated ? "A fatigue call is professionally defensible at this level." : "Above the fatigue-call threshold."}`, size: 9.5 },
+    ], { fill: BAND_FILL[h.band] ?? CARD, accent: BAND_COLORS[h.band] ?? NAVY, titleColor: INK });
+  }
+
+  // Duty table
+  doc.heading("Duty-by-duty effectiveness");
+  // Widths sum to the inner width (516 pt). "Where" the low point falls is in the riskiest-duty
+  // panel and the assessment; the table keeps the layover so the row reads report -> release -> then.
+  const cols = [
+    ["Day", 28], ["Sequence", 98], ["Report → Release (local)", 148], ["Duty", 32], ["Ldg", 22],
+    ["Start", 40], ["Low", 46], ["End", 40], ["Then", doc.innerWidth - 454],
+  ];
+  const drawHeader = () => {
+    doc.ensure(16);
+    let x = m;
+    for (const [label, w] of cols) { doc.text(label, x, doc.y - 10, { size: 7.8, bold: true, color: SUB }); x += w; }
+    doc.y -= 14;
+    doc.rule(m, doc.y, right, "#C9CED8");
+  };
+  const pct = (x, base, value, band, bold = false) => {
+    if (value === null || value === undefined) { doc.text("—", x, base, { size: 8.5 }); return; }
+    doc.rect(x, base - 3, 7, 7, BAND_COLORS[band] ?? SUB);
+    doc.text(`${value}%`, x + 10, base, { size: 8.5, bold });
+  };
+  drawHeader();
+  for (const d of model.duties) {
+    const seqLines = doc.wrap(d.sequence, cols[1][1] - 6, 8.5, false).slice(0, 3);
+    const thenLines = doc.wrap(d.layover, cols[8][1] - 2, 8, false).slice(0, 3);
+    const lines = Math.max(seqLines.length, thenLines.length, d.combined !== null ? 2 : 1);
+    const rowH = 12 + (lines - 1) * 10 + 6;
+    if (doc.y - rowH < doc.bottom) { doc.newPage(); drawHeader(); }
+    const base = doc.y - 11;
+    let x = m;
+    const cell = (text, w, opts = {}) => { doc.text(text, x, base, { size: 8.5, ...opts }); x += w; };
+    cell(`D${d.day}`, cols[0][1], { bold: true });
+    seqLines.forEach((line, i) => doc.text(line, x, base - i * 10, { size: 8.5 }));
+    x += cols[1][1];
+    cell(`${d.report} → ${d.release}`, cols[2][1]);
+    cell(d.actualDuty ?? d.duty, cols[3][1], d.actualDuty ? { color: RED, bold: true } : {});
+    cell(String(d.landings), cols[4][1]);
+    pct(x, base, d.startPct, d.startBand); x += cols[5][1];
+    pct(x, base, d.minPct, d.band, true);
+    if (d.combined !== null) doc.text(`CC ${d.combined}`, x + 10, base - 10, { size: 7.5, color: SUB });
+    x += cols[6][1];
+    pct(x, base, d.endPct, d.endBand); x += cols[7][1];
+    thenLines.forEach((line, i) => doc.text(line, x, base - i * 10, { size: 8, color: SUB }));
+    doc.y -= rowH;
+    doc.rule(m, doc.y + 2, right);
+  }
+  doc.y -= 4;
+  doc.paragraph("Report and release are solved from the printed Duty and L/O columns (not printed on the Trip Board). Start, low and end are the estimated effectiveness at report, at the minimum, and at release; bands: Normal >= 90, Monitor 85–90, Elevated 80–85, High 75–80, Critical < 75. A red duty length is the logged actual.",
+    { size: 8, color: SUB });
+
+  // Today + riskiest remaining
+  const t = model.today;
+  if (t.phase === "complete") {
+    doc.panel("TRIP COMPLETE", [{ text: "Every duty period has been released. The panels below describe the trip as flown.", size: 9.5, color: SUB }], { fill: NAVY_FILL, accent: NAVY });
+  } else {
+    doc.panel(t.phase === "in progress" ? `TODAY — D${t.day} IN PROGRESS` : `NEXT UP — D${t.day} (${t.date})`, [
+      { text: `Report ${t.report} at ${t.reportStation}`, size: 9.5, bold: true },
+      ...t.legs.map((l) => ({ text: l, size: 9 })),
+      { text: `Release ${t.release} · duty ${t.duty}${t.actual ? " (actual)" : ""}`, size: 9.5 },
+      { text: `Lowest ${t.lowest}`, size: 9.5 },
+      { text: `Then ${t.layoverAfter}${t.recoveryTo ? ` → recovery to ${t.recoveryTo}` : ""}`, size: 9.5 },
+    ], { fill: NAVY_FILL, accent: NAVY });
+  }
+  const r = model.riskiest;
+  if (r) {
+    doc.panel(`${r.remaining ? "MOST RISKY REMAINING DUTY" : "MOST RISKY DUTY"} — D${r.day} ${r.route}`, [
+      { text: `${r.minPct}% — ${r.bandLabel}`, size: 14, bold: true, color: BAND_COLORS[r.band] ?? INK, after: 4 },
+      ...r.bullets.map((b) => ({ text: `•  ${b}`, size: 9 })),
+    ], { fill: BAND_FILL[r.band] ?? CARD, accent: BAND_COLORS[r.band] ?? RED, titleColor: INK });
+  }
+  const rec = model.recovery;
+  if (rec) {
+    doc.panel(`RECOVERY — ${rec.station} LAYOVER AFTER D${rec.afterDay} (${rec.layover})`, [
+      { text: `Sleep opportunity ${rec.opportunityHours}: ${rec.window}`, size: 9.5, bold: true },
+      { text: `Modeled effective sleep ${rec.effective}${rec.short ? " — short" : ""}`, size: 9.5, color: rec.short ? RED : INK },
+      ...rec.blocks.map((b) => ({ text: b, size: 9, color: SUB })),
+      ...model.recommendations.slice(0, 3).map((x) => ({ text: `•  ${x}`, size: 9 })),
+    ], { fill: GREEN_FILL, accent: "#2F855A" });
   }
 
   // Facts, two columns
@@ -240,62 +374,9 @@ export function summaryPdf(model) {
   doc.y -= rows * 14 + 6;
   if (model.revised) doc.paragraph(`Schedule revision: ${model.revised}`, { size: 9.5, color: RED, bold: true });
   if (model.factors.length) doc.paragraph(`Conditions across the trip (counted as workload): ${model.factors.join(", ")}`, { size: 9.5, color: INK });
-  if (model.logged.length) {
-    doc.heading("Logged as the trip unfolded");
-    for (const l of model.logged) {
-      doc.paragraph(`Day ${l.day}: ${l.text}${l.note ? ` — ${l.note}` : ""}`, { size: 9.5, after: 3 });
-    }
-    doc.paragraph("Delays are applied to the timeline above (legs, release, and the layover that follows). Conditions are workload in the Combined Capacity figure and do not alter the effectiveness estimate.", { size: 8, color: SUB });
-  }
 
   doc.heading("How this trip is built");
   doc.paragraph(model.narrative, { size: 9.8 });
-
-  // Duty table
-  doc.heading("By duty period");
-  // Widths sum to the inner width (516 pt). The report/release cell is the widest text in the
-  // table — "10:17L (14:17Z) -> 16:57L (20:57Z)" is about 150 pt at 8.5 pt — so it gets the room.
-  const cols = [
-    ["Day", 30], ["Route", 58], ["Report → Release (local)", 160], ["Duty", 34], ["Ldg", 24],
-    ["Lowest", 46], ["Where", 96], ["Then", doc.innerWidth - 448],
-  ];
-  const drawHeader = () => {
-    doc.ensure(16);
-    let x = m;
-    for (const [label, w] of cols) { doc.text(label, x, doc.y - 10, { size: 7.8, bold: true, color: SUB }); x += w; }
-    doc.y -= 14;
-    doc.rule(m, doc.y, right, "#C9CED8");
-  };
-  drawHeader();
-  for (const d of model.duties) {
-    const whereLines = doc.wrap(d.minWhere, cols[6][1] - 6, 8.5, false).slice(0, 3);
-    const thenLines = doc.wrap(d.layover, cols[7][1] - 2, 8.5, false).slice(0, 3);
-    const lines = Math.max(whereLines.length, thenLines.length, d.combined !== null ? 2 : 1);
-    const rowH = 12 + (lines - 1) * 10 + 6;
-    if (doc.y - rowH < doc.bottom) { doc.newPage(); drawHeader(); }
-    const base = doc.y - 11;
-    let x = m;
-    const cell = (text, w, opts = {}) => { doc.text(text, x, base, { size: 8.5, ...opts }); x += w; };
-    cell(`D${d.day}`, cols[0][1], { bold: true });
-    cell(d.route, cols[1][1]);
-    cell(`${d.report} → ${d.release}`, cols[2][1]);
-    cell(d.actualDuty ?? d.duty, cols[3][1], d.actualDuty ? { color: RED } : {});
-    cell(String(d.landings), cols[4][1]);
-    if (d.minPct !== null) {
-      doc.rect(x, base - 3, 7, 7, BAND_COLORS[d.band] ?? SUB);
-      doc.text(`${d.minPct}%`, x + 10, base, { size: 8.5, bold: true });
-      if (d.combined !== null) doc.text(`CC ${d.combined}`, x + 10, base - 10, { size: 7.5, color: SUB });
-    } else doc.text("—", x, base, { size: 8.5 });
-    x += cols[5][1];
-    whereLines.forEach((line, i) => doc.text(line, x, base - i * 10, { size: 8.5 }));
-    x += cols[6][1];
-    thenLines.forEach((line, i) => doc.text(line, x, base - i * 10, { size: 8.5, color: SUB }));
-    doc.y -= rowH;
-    doc.rule(m, doc.y + 2, right);
-  }
-  doc.y -= 4;
-  doc.paragraph("Report and release are solved from the printed Duty and L/O columns (not printed on the Trip Board). Lowest is the estimated effectiveness minimum inside the duty period; the band follows the trip's risk convention (Normal ≥ 90, Monitor 85–90, Elevated 80–85, High 75–80, Critical < 75).",
-    { size: 8, color: SUB });
 
   // Sleep table
   if (model.sleep.length) {
@@ -338,7 +419,7 @@ export function summaryPdf(model) {
   }
 
   doc.heading("What helps");
-  for (const r of model.recommendations) doc.paragraph(`•  ${r}`, { size: 9.5, x: m + 4, after: 3 });
+  for (const x of model.recommendations) doc.paragraph(`•  ${x}`, { size: 9.5, x: m + 4, after: 3 });
 
   doc.heading("Worth knowing");
   for (const w of model.watch) doc.paragraph(`•  ${w}`, { size: 9.5, x: m + 4, after: 3 });
@@ -362,10 +443,9 @@ export function summaryPdf(model) {
   doc.heading("Model notes");
   doc.paragraph(model.modelAssumptions, { size: 8.5, color: SUB });
   doc.paragraph(model.circadian, { size: 8.5, color: SUB });
+  doc.paragraph(model.uncertainty, { size: 8.5, color: SUB });
   doc.paragraph(model.reminder, { size: 8.5, color: SUB });
   doc.paragraph(model.engine, { size: 8.5, color: SUB });
 
   return doc.build();
 }
-
-const cap = (s) => (s ? s[0].toUpperCase() + s.slice(1) : s);

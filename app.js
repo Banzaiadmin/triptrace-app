@@ -16,7 +16,7 @@ const $ = (id) => document.getElementById(id);
 const LAST_KEY = "triptrace.last";
 const INSTALL_DISMISSED_KEY = "triptrace.install-dismissed";
 // Bump together with ASSET_VERSION in sw.js and the ?v= in index.html.
-const V = "7";
+const V = "8";
 
 // The on-device engine, loaded lazily so a browser that cannot run it still has the service path.
 let engine = null;
@@ -645,16 +645,24 @@ async function currentSummary() {
 
 function renderSummary(model) {
   const bandVar = (band) => `var(--band-${band || "green"})`;
+  const chip = (pct, band) => (pct === null || pct === undefined ? "—"
+    : `<span class="pchip" style="background:${bandVar(band)}22;color:${bandVar(band)}">${pct}%</span>`);
+  const tiles = model.tiles.map((t) => `
+    <div class="tile ${t.alert ? "alert" : ""}">
+      <div class="tv" ${t.band ? `style="color:${bandVar(t.band)}"` : ""}>${esc(t.value)}</div>
+      <div class="tl">${esc(t.label)}</div>
+    </div>`).join("");
   const facts = model.facts.map(([k, v]) => `<div><span>${esc(k)}</span><span>${esc(v)}</span></div>`).join("");
   const duties = model.duties.map((d) => `
     <tr>
       <td class="num"><b>D${d.day}</b><br><span class="sub">${esc(d.date)}</span></td>
-      <td>${esc(d.route)}${d.deadheads ? `<br><span class="sub">${d.deadheads} deadhead${d.deadheads === 1 ? "" : "s"}</span>` : ""}</td>
+      <td>${esc(d.sequence)}${d.deadheads ? `<br><span class="sub">${d.deadheads} deadhead${d.deadheads === 1 ? "" : "s"}</span>` : ""}</td>
       <td class="num">${esc(d.report)}<br>→ ${esc(d.release)}</td>
       <td class="num">${d.actualDuty ? `<span class="short">${esc(d.actualDuty)}</span>` : esc(d.duty)}<br><span class="sub">${d.landings} ldg</span></td>
-      <td class="num">${d.minPct === null ? "—" : `<span class="sw" style="background:${bandVar(d.band)}"></span><b>${d.minPct}%</b><br><span class="sub">${d.combined !== null ? `CC ${d.combined}%` : esc(d.bandLabel)}</span>`}</td>
-      <td>${esc(d.minWhere)}${d.minAt ? `<br><span class="sub">${esc(d.minAt)}</span>` : ""}</td>
-      <td class="sub">${esc(d.layover)}</td>
+      <td class="num">${chip(d.startPct, d.startBand)}</td>
+      <td class="num">${chip(d.minPct, d.band)}${d.combined !== null ? `<br><span class="sub">CC ${d.combined}%</span>` : ""}</td>
+      <td class="num">${chip(d.endPct, d.endBand)}</td>
+      <td class="sub">${esc(d.minWhere)}${d.minAt ? ` · ${esc(d.minAt)}` : ""}<br>then ${esc(d.layover)}</td>
     </tr>`).join("");
   const sleep = model.sleep.map((s) => `
     <tr>
@@ -665,44 +673,79 @@ function renderSummary(model) {
       <td class="num ${s.short ? "short" : ""}">${esc(s.effective)}</td>
       <td class="sub">${s.blocks.map(esc).join("<br>") || "none modeled"}</td>
     </tr>`).join("");
+  const h = model.headline;
+  const t = model.today;
+  const r = model.riskiest;
+  const rec = model.recovery;
 
   $("summary-doc").innerHTML = `
     <div class="masthead">
       <div class="wordmark"><span class="a">TRIP</span><span class="b">TRACE</span></div>
-      <div class="eyebrow">Fatigue summary</div>
+      <div class="eyebrow">Fatigue risk summary${h && h.updated ? " — updated" : ""}</div>
     </div>
     <h1>${esc(model.title)}</h1>
     <div class="meta">${esc(model.subtitle)}</div>
     <div class="meta">${esc(model.prepared)}</div>
-    ${model.headline ? `
-      <div class="headline" style="border-left-color:${bandVar(model.headline.band)}">
-        <div class="pct">${Math.round(model.headline.minPct)}%</div>
-        <div>
-          <div class="band" style="color:${bandVar(model.headline.band)}">${esc(model.headline.bandLabel)} band — lowest estimated effectiveness</div>
-          <p>At ${esc(model.headline.where)}${model.headline.at ? ` (${esc(model.headline.at)})` : ""}</p>
-          <p class="sub">${esc(model.headline.bac[0].toUpperCase() + model.headline.bac.slice(1))}.
-            ${model.headline.fatigueCallIndicated ? "A fatigue call is professionally defensible at this level." : "Above the fatigue-call threshold."}</p>
-        </div>
+
+    <div class="tiles">${tiles}</div>
+
+    ${model.logged.length ? `
+      <div class="box event">
+        <h3>Operational events logged</h3>
+        ${model.logged.map((l) => `<p><b>Day ${l.day}:</b> ${esc(l.text)}${l.note ? ` — <span class="sub">${esc(l.note)}</span>` : ""}</p>`).join("")}
+        <p class="notes">Delays are applied to the timeline (legs, release, and the layover that follows). Conditions are workload in the Combined Capacity figure and do not alter the effectiveness estimate.</p>
+      </div>` : ""}
+
+    ${h ? `
+      <div class="box assess" style="border-left-color:${bandVar(h.band)}">
+        <h3>${h.updated ? "Updated current" : "Current"} fatigue assessment</h3>
+        <div class="big">Trip minimum effectiveness: ${Math.round(h.minPct)}% <span style="color:${bandVar(h.band)}">${esc(h.bandLabel)}</span></div>
+        <p>At ${esc(h.where)}${h.at ? ` (${esc(h.at)})` : ""}. ${esc(h.bac[0].toUpperCase() + h.bac.slice(1))}.
+          ${h.fatigueCallIndicated ? "A fatigue call is professionally defensible at this level." : "Above the fatigue-call threshold."}</p>
+      </div>` : ""}
+
+    <h2>Duty-by-duty effectiveness</h2>
+    <div class="table-scroll"><table>
+      <thead><tr><th>Day</th><th>Sequence</th><th>Report → release (local)</th><th>Duty</th><th>Start</th><th>Low</th><th>End</th><th>Where · then</th></tr></thead>
+      <tbody>${duties}</tbody>
+    </table></div>
+    <p class="notes" style="margin-top:8px">Report and release are solved from the printed Duty and L/O columns. Bands: Normal ≥ 90, Monitor 85–90, Elevated 80–85, High 75–80, Critical &lt; 75. A red duty length is the logged actual.</p>
+
+    <div class="panels">
+      <div class="box today">
+        <h3>${t.phase === "complete" ? "Trip complete" : t.phase === "in progress" ? `Today — D${t.day} in progress` : `Next up — D${t.day}`}</h3>
+        ${t.phase === "complete" ? `<p class="sub">Every duty period has been released. The panels below describe the trip as flown.</p>` : `
+          <div class="kv"><span>Report</span><span>${esc(t.report)} at ${esc(t.reportStation)}</span></div>
+          ${t.legs.map((l) => `<div class="kv"><span>Leg</span><span>${esc(l)}</span></div>`).join("")}
+          <div class="kv"><span>Release</span><span>${esc(t.release)}</span></div>
+          <div class="kv"><span>Duty length</span><span>${esc(t.duty)}${t.actual ? " (actual)" : ""}</span></div>
+          <div class="kv"><span>Lowest</span><span>${esc(t.lowest)}</span></div>
+          <div class="kv"><span>Then</span><span>${esc(t.layoverAfter)}${t.recoveryTo ? ` → recovery to ${t.recoveryTo}` : ""}</span></div>`}
+      </div>
+      ${r ? `
+      <div class="box risky" style="border-left-color:${bandVar(r.band)}">
+        <h3>${r.remaining ? "Most risky remaining duty" : "Most risky duty"} — D${r.day} ${esc(r.route)}</h3>
+        <div class="big">${r.minPct}% <span style="color:${bandVar(r.band)}">${esc(r.bandLabel)}</span></div>
+        <ul>${r.bullets.map((b) => `<li>${esc(b)}</li>`).join("")}</ul>
+      </div>` : ""}
+    </div>
+
+    ${rec ? `
+      <div class="box recover">
+        <h3>Recovery — ${esc(rec.station)} layover after D${rec.afterDay} (${esc(rec.layover)})</h3>
+        <div class="kv"><span>Sleep opportunity</span><span>${esc(rec.opportunityHours)} · ${esc(rec.window)}</span></div>
+        <div class="kv"><span>Modeled effective</span><span class="${rec.short ? "short" : ""}">${esc(rec.effective)}</span></div>
+        ${rec.blocks.map((b) => `<div class="kv"><span>Block</span><span>${esc(b)}</span></div>`).join("")}
+        <ul>${model.recommendations.slice(0, 3).map((x) => `<li>${esc(x)}</li>`).join("")}</ul>
       </div>` : ""}
 
     <h2>Trip facts</h2>
     <div class="facts">${facts}</div>
     ${model.revised ? `<p class="revised">Schedule revision: ${esc(model.revised)}</p>` : ""}
     ${model.factors.length ? `<p class="sub small" style="margin-top:8px">Conditions across the trip (counted as workload): ${esc(model.factors.join(", "))}</p>` : ""}
-    ${model.logged.length ? `
-      <h2>Logged as the trip unfolded</h2>
-      ${model.logged.map((l) => `<p><b>Day ${l.day}:</b> ${esc(l.text)}${l.note ? ` — <span class="sub">${esc(l.note)}</span>` : ""}</p>`).join("")}
-      <p class="notes">Delays are applied to the timeline (legs, release, and the layover that follows). Conditions are workload in the Combined Capacity figure and do not alter the effectiveness estimate.</p>` : ""}
 
     <h2>How this trip is built</h2>
     <p>${esc(model.narrative)}</p>
-
-    <h2>By duty period</h2>
-    <div class="table-scroll"><table>
-      <thead><tr><th>Day</th><th>Route</th><th>Report → release (local)</th><th>Duty</th><th>Lowest</th><th>Where</th><th>Then</th></tr></thead>
-      <tbody>${duties}</tbody>
-    </table></div>
-    <p class="notes" style="margin-top:8px">Report and release are solved from the printed Duty and L/O columns. Bands: Normal ≥ 90, Monitor 85–90, Elevated 80–85, High 75–80, Critical &lt; 75.</p>
 
     ${model.sleep.length ? `
       <h2>Sleep by layover</h2>
@@ -719,7 +762,7 @@ function renderSummary(model) {
         <span class="sub">${esc(c.contractNote)}</span></p>`).join("")}` : ""}
 
     <h2>What helps</h2>
-    <ul>${model.recommendations.map((r) => `<li>${esc(r)}</li>`).join("")}</ul>
+    <ul>${model.recommendations.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>
 
     <h2>Worth knowing</h2>
     <ul>${model.watch.map((w) => `<li>${esc(w)}</li>`).join("")}</ul>
@@ -734,6 +777,7 @@ function renderSummary(model) {
     <h2>Model notes</h2>
     <p class="notes">${esc(model.modelAssumptions)}</p>
     <p class="notes">${esc(model.circadian)}</p>
+    <p class="notes">${esc(model.uncertainty)}</p>
     <p class="notes">${esc(model.reminder)}</p>
     <p class="notes">${esc(model.engine)}</p>`;
 }

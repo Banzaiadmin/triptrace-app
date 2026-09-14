@@ -1,5 +1,21 @@
 [
   {
+    "id": "ups-11596",
+    "carrier": "ups",
+    "label": "UPS 11596",
+    "summary": "4 duty days \u00b7 10 legs \u00b7 SDF 757 \u00b7 TAFB 81:19",
+    "note": "Four early-morning duties through MEM, SAT, LRD, IAH, DEN, TUL and OKC \u2014 three legs a day, the last one home. Transcribed from a real Trip Board.",
+    "text": "Trip Details - 1159 - SDF 757\nEqp  Date     Pairing  Flt   Pos  Dep  (L)  Z      Arr  (L)  Z      Blk   Duty   Cr     L/O\n     9/24/26  11596    780   CPT  SDF  (TH02)06:40  MEM  (02)07:50  1:10\n     9/24/26  11596    780   CPT  MEM  (TH03)08:35  SAT  (05)10:33  1:58\n     9/24/26  11596    780   CPT  SAT  (TH06)11:22  LRD  (07)12:07  0:45\n                                                                    3:53  6:42   4:28E  11:21\n     9/25/26  11596    781   CPT  LRD  (TH19)00:43  IAH  (20)01:49  1:06\n     9/25/26  11596    781   CPT  IAH  (TH21)02:35  SDF  (00)04:39  2:04\n     9/25/26  11596    802   CPT  SDF  (FR03)07:16  DEN  (04)10:01  2:45\n                                                                    5:55  10:33  7:02E  16:22\n     9/26/26  11596    801   CPT  DEN  (FR21)03:38  SDF  (02)06:05  2:27\n     9/26/26  11596    734   CPT  SDF  (SA04)08:33  TUL  (05)10:15  1:42\n     9/26/26  11596    734   CPT  TUL  (SA06)11:22  OKC  (07)12:02  0:40\n                                                                    4:49  9:39   6:26E  23:43\n     9/27/26  11596    5739  CPT  OKC  (SU08)13:00  SDF  (10)14:44  1:44\n                                                                    1:44  2:59   4:00M  0:00\nCredit: 21:56D  Out Credit: 0:00  Blk: 16:21  Prem: $0.00  PDiem: $284.61  TAFB: 81:19  Duty Days: 4\n"
+  },
+  {
+    "id": "ups-S51156",
+    "carrier": "ups",
+    "label": "UPS S51156",
+    "summary": "5 duty days \u00b7 10 legs \u00b7 SDF 757 \u00b7 TAFB 115:55",
+    "note": "West coast and mountain flying: SAN, a 12:42 duty ending on a ground deadhead to RFD, ONT, then BIL and SLC. Transcribed from a real Trip Board.",
+    "text": "Trip Details - S5115 - SDF 757\nEqp  Date     Pairing  Flt   Pos  Dep  (L)  Z      Arr  (L)  Z      Blk   Duty   Cr     L/O\n     9/18/26  S51156   5636  CPT  SDF  (FR15)19:56  SAN  (17)00:12  4:16\n                                                                    4:16  5:31   4:16L  12:28\n     9/19/26  S51156   5929  CPT  SAN  (SA06)13:55  SDF  (13)17:51  3:56\n     9/19/26  S51156   5602  CPT  SDF  (SA18)22:00  ORD  (18)23:22  1:22\nDH   9/19/26  S51156   8888  CPT  ORD  (SA18)23:37  RFD  (20)01:37  0:00\n                                                                    5:18  12:42  6:21D  17:53\n     9/20/26  S51156   5924  CPT  RFD  (SU15)20:30  ONT  (17)00:18  3:48\n                                                                    3:48  5:03   4:00M  31:12\n     9/22/26  S51156   598   CPT  ONT  (TU01)08:45  BIL  (05)11:03  2:18\n     9/22/26  S51156   9892  CPT  BIL  (TU05)11:55  SLC  (07)13:12  1:17\n     9/22/26  S51156   5847  CPT  SLC  (TU08)14:00  RFD  (11)16:39  2:39\n                                                                    6:14  9:09   6:14L  13:40\n     9/23/26  S51156   846   CPT  RFD  (WE02)07:34  SLC  (04)10:29  2:55\n     9/23/26  S51156   2843  CPT  SLC  (WE05)11:30  SDF  (10)14:36  3:06\n                                                                    6:01  8:17   6:01L  0:00\nCredit: 30:55T  Out Credit: 0:00  Blk: 25:37  Prem: $0.00  PDiem: $405.71  TAFB: 115:55  Duty Days: 5\n"
+  },
+  {
     "id": "ups-14707",
     "carrier": "ups",
     "label": "UPS 14707",

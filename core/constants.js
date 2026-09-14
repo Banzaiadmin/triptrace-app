@@ -717,6 +717,10 @@ export const STATIONS = Object.freeze({
     "America/Chicago",
     "US"
   ],
+  "LRD": [
+    "America/Chicago",
+    "US"
+  ],
   "MAD": [
     "Europe/Madrid",
     "ES"
