@@ -334,6 +334,7 @@ export function summaryPdf(model) {
     doc.panel("TRIP COMPLETE", [{ text: "Every duty period has been released. The panels below describe the trip as flown.", size: 9.5, color: SUB }], { fill: NAVY_FILL, accent: NAVY });
   } else {
     doc.panel(t.phase === "in progress" ? `TODAY — D${t.day} IN PROGRESS` : `NEXT UP — D${t.day} (${t.date})`, [
+      ...(t.pickup ? [{ text: `Hotel pickup ${t.pickup}`, size: 9.5 }] : []),
       { text: `Report ${t.report} at ${t.reportStation}`, size: 9.5, bold: true },
       ...t.legs.map((l) => ({ text: l, size: 9 })),
       { text: `Release ${t.release} · duty ${t.duty}${t.actual ? " (actual)" : ""}`, size: 9.5 },

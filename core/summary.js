@@ -13,7 +13,9 @@
  * recovery window before it. That last part depends on the clock, so `context.now` is an input.
  */
 
-import { BAND_LABELS, EFFECTIVENESS_BANDS, STATIONS } from "./constants.js";
+import {
+  BAND_LABELS, EFFECTIVENESS_BANDS, HOTEL_PICKUP_HOURS, REPORT_ALLOWANCE_HOURS, STATIONS,
+} from "./constants.js";
 import { hmFromHours } from "./py.js";
 import { fmtLocal, parseUtc } from "./tz.js";
 
@@ -50,6 +52,23 @@ const fmt1 = (n) => (n === null || n === undefined ? "—" : (Math.round(n * 10)
 const bandOf = (pct) => (EFFECTIVENESS_BANDS.find((b) => b.low <= pct && pct < b.high) ??
   EFFECTIVENESS_BANDS[EFFECTIVENESS_BANDS.length - 1]).band;
 const stationTz = (code) => (STATIONS[code] ? STATIONS[code][0] : null);
+
+/**
+ * Hotel pickup for a duty that starts away from domicile: pickup is HOTEL_PICKUP_HOURS before
+ * departure and show is REPORT_ALLOWANCE_HOURS before it, so pickup precedes report by the
+ * difference (owner-confirmed: 30 minutes, domestic and international). Null at domicile.
+ */
+function hotelPickup(duty, domicile) {
+  const first = (duty.legs ?? [])[0];
+  if (!first || first.dep_station === domicile) return null;
+  const kind = first.is_international ? "international" : "domestic";
+  const before = HOTEL_PICKUP_HOURS[kind] - REPORT_ALLOWANCE_HOURS[`${kind}_away`];
+  const ms = parseUtc(duty.report.utc) - before * HOUR;
+  const tz = stationTz(first.dep_station);
+  const localText = tz ? `${fmtLocal(tz, ms).slice(11, 16)}L` : null;
+  const z = zulu(new Date(ms).toISOString().slice(0, 19) + "Z");
+  return localText ? `${localText} (${z})` : z;
+}
 
 /**
  * "Sun 18:33 – Mon 23:30 local (01:33Z–06:30Z, 29.0 h)" style window at a station. The day names
@@ -246,6 +265,7 @@ export function summaryModel(payload, context = {}) {
     date: dateText(current.d.date_local),
     report: clockText(current.d.report),
     reportStation: current.d.legs?.[0]?.dep_station ?? "",
+    pickup: hotelPickup(current.d, meta.domicile),
     legs: (current.d.legs ?? []).map((l) => `${l.flight} ${l.dep_station}–${l.arr_station} ${clockText(l.dep)} → ${clockText(l.arr)}${(l.raw ?? {}).deadhead ? " (deadhead)" : ""}`),
     release: clockText(current.d.release),
     duty: hmFromHours((current.d.scheduled_duty ?? {}).actual_hours ?? (current.d.scheduled_duty ?? {}).scheduled_hours ?? null),
@@ -271,6 +291,7 @@ export function summaryModel(payload, context = {}) {
       : 0;
     const restBefore = rests.find((r) => r.after_duty_day === d.day_index - 1);
     const bodyReport = d.report.body_clock ? d.report.body_clock.slice(11, 16) : null;
+    const pickup = hotelPickup(d, meta.domicile);
     riskiest = {
       day: d.day_index,
       remaining: ahead.length > 0,
@@ -279,7 +300,7 @@ export function summaryModel(payload, context = {}) {
       band: e.band,
       bandLabel: BAND_LABELS[e.band] ?? "",
       bullets: [
-        `Report ${clockText(d.report)} at ${legs[0]?.dep_station ?? "—"}${bodyReport ? `, body clock ${bodyReport}` : ""}.`,
+        `${pickup ? `Hotel pickup ${pickup}, report` : "Report"} ${clockText(d.report)} at ${legs[0]?.dep_station ?? "—"}${bodyReport ? `, body clock ${bodyReport}` : ""}.`,
         `Lowest point ${e.min_pct}% near ${e.min_location} at ${zulu(e.min_at_utc)}${BAC_TEXT[e.band] ? ` — ${BAC_TEXT[e.band]}` : ""}.`,
         inWocl ? `${inWocl} landing${inWocl === 1 ? "" : "s"} inside the window of circadian low.` : "No landing inside the window of circadian low.",
         `${d.landings ?? 0} landing${(d.landings ?? 0) === 1 ? "" : "s"} over ${hmFromHours((d.scheduled_duty ?? {}).actual_hours ?? (d.scheduled_duty ?? {}).scheduled_hours ?? null)} of duty.`,
@@ -388,6 +409,7 @@ export function summaryText(model) {
   }
   if (model.today.phase !== "complete") {
     lines.push("", `${model.today.phase === "in progress" ? "TODAY — IN PROGRESS" : "NEXT UP"} — D${model.today.day} ${model.today.date}`);
+    if (model.today.pickup) lines.push(`  Hotel pickup ${model.today.pickup}`);
     lines.push(`  Report ${model.today.report} at ${model.today.reportStation}`);
     for (const l of model.today.legs) lines.push(`  ${l}`);
     lines.push(`  Release ${model.today.release} · duty ${model.today.duty}${model.today.actual ? " (actual)" : ""} · lowest ${model.today.lowest} · then ${model.today.layoverAfter}`);

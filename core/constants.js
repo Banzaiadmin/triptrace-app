@@ -145,13 +145,19 @@ export const EFFECTIVENESS_BAC_TABLE = Object.freeze([
 export const REPORT_ALLOWANCE_HOURS = Object.freeze({
   "domestic_in_domicile": 1.0,
   "international_in_domicile": 1.5,
-  "domestic_away": 1.5,
-  "international_away": 2.0
+  "domestic_away": 1.0,
+  "international_away": 1.5
 });
 
 export const DEBRIEF_HOURS = Object.freeze({
   "domestic": 0.25,
   "international": 0.5
+});
+
+/** Hotel pickup before departure, away from domicile (owner-confirmed). */
+export const HOTEL_PICKUP_HOURS = Object.freeze({
+  "domestic": 1.5,
+  "international": 2.0
 });
 
 /** Spec 2D augmentation bands for international flying. */

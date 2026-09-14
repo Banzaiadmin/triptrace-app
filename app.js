@@ -16,7 +16,7 @@ const $ = (id) => document.getElementById(id);
 const LAST_KEY = "triptrace.last";
 const INSTALL_DISMISSED_KEY = "triptrace.install-dismissed";
 // Bump together with ASSET_VERSION in sw.js and the ?v= in index.html.
-const V = "8";
+const V = "9";
 
 // The on-device engine, loaded lazily so a browser that cannot run it still has the service path.
 let engine = null;
@@ -715,6 +715,7 @@ function renderSummary(model) {
       <div class="box today">
         <h3>${t.phase === "complete" ? "Trip complete" : t.phase === "in progress" ? `Today — D${t.day} in progress` : `Next up — D${t.day}`}</h3>
         ${t.phase === "complete" ? `<p class="sub">Every duty period has been released. The panels below describe the trip as flown.</p>` : `
+          ${t.pickup ? `<div class="kv"><span>Hotel pickup</span><span>${esc(t.pickup)}</span></div>` : ""}
           <div class="kv"><span>Report</span><span>${esc(t.report)} at ${esc(t.reportStation)}</span></div>
           ${t.legs.map((l) => `<div class="kv"><span>Leg</span><span>${esc(l)}</span></div>`).join("")}
           <div class="kv"><span>Release</span><span>${esc(t.release)}</span></div>
