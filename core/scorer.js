@@ -41,6 +41,9 @@ const MIN_SLEEP_BLOCK_HOURS = 0.75;
 const MAX_CORE_SLEEP_HOURS = 8.5;
 const MAX_NAP_HOURS = 2.0;
 const SPLIT_SLEEP_THRESHOLD_HOURS = 5.0;
+// See scorer.py: a layover containing several body-clock nights is slept in several nights.
+const MIN_WAKE_BETWEEN_SLEEPS_HOURS = 12.0;
+const MAX_SLEEP_BLOCKS_PER_REST = 8;
 const PRE_TRIP_SLEEP_HOURS = 7.5;
 const PRE_TRIP_LEAD_HOURS = 48;
 const BODY_NIGHT_START_HOUR = 22.0;
@@ -174,22 +177,34 @@ function planRestSleep(windowStart, windowEnd, clock) {
   const total = hoursBetween(windowStart, windowEnd);
   if (total < MIN_SLEEP_BLOCK_HOURS) return [];
 
-  let coreStart = bestNightAlignedStart(windowStart, windowEnd, clock);
-  let coreHours = Math.min(MAX_CORE_SLEEP_HOURS, hoursBetween(coreStart, windowEnd));
-  if (coreHours < MIN_SLEEP_BLOCK_HOURS) {
-    coreStart = windowStart;
-    coreHours = Math.min(MAX_CORE_SLEEP_HOURS, total);
+  // One core per body-clock night the window contains. A 67:50 layover is three nights in a hotel,
+  // not one followed by 56 hours awake — see the long comment in scorer.py.
+  const events = [];
+  let segmentStart = windowStart;
+  while (events.length < MAX_SLEEP_BLOCKS_PER_REST) {
+    const remainingWindow = hoursBetween(segmentStart, windowEnd);
+    if (remainingWindow < MIN_SLEEP_BLOCK_HOURS) break;
+
+    let coreStart = bestNightAlignedStart(segmentStart, windowEnd, clock);
+    let coreHours = Math.min(MAX_CORE_SLEEP_HOURS, hoursBetween(coreStart, windowEnd));
+    if (coreHours < MIN_SLEEP_BLOCK_HOURS) {
+      coreStart = segmentStart;
+      coreHours = Math.min(MAX_CORE_SLEEP_HOURS, remainingWindow);
+    }
+
+    const end = coreStart + coreHours * HOUR;
+    const isNight = mostlyNight(coreStart, end, clock);
+    events.push(new PlannedSleep(
+      coreStart, end,
+      isNight ? "anchor" : "hotel_core",
+      isNight ? MODEL_PARAMS.nocturnal_sleep_efficiency : MODEL_PARAMS.daytime_sleep_efficiency,
+    ));
+    segmentStart = end + MIN_WAKE_BETWEEN_SLEEPS_HOURS * HOUR;
   }
 
-  const coreEnd = coreStart + coreHours * HOUR;
-  const nocturnal = mostlyNight(coreStart, coreEnd, clock);
-  const events = [
-    new PlannedSleep(
-      coreStart, coreEnd,
-      nocturnal ? "anchor" : "hotel_core",
-      nocturnal ? MODEL_PARAMS.nocturnal_sleep_efficiency : MODEL_PARAMS.daytime_sleep_efficiency,
-    ),
-  ];
+  const last = events[events.length - 1];
+  const coreHours = hoursBetween(last.start, last.end);
+  const coreEnd = last.end;
 
   const remaining = hoursBetween(coreEnd, windowEnd);
   if (coreHours < SPLIT_SLEEP_THRESHOLD_HOURS && remaining >= MIN_SLEEP_BLOCK_HOURS + 0.5) {
