@@ -352,9 +352,10 @@ details.log .log-state { font-weight: 500; color: var(--red); font-size: 12.5px;
 .summary-actions .btn { margin-bottom: 8px; }
 .summary { color: var(--ink); font-size: 13.5px; line-height: 1.5; }
 .summary .masthead {
-  display: flex; justify-content: space-between; align-items: baseline;
+  display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap;
   border-top: 5px solid var(--navy); padding-top: 12px; margin-bottom: 14px;
 }
+.summary .masthead .eyebrow { text-align: right; }
 .summary .masthead .eyebrow { color: var(--sub); }
 .summary h1 { font-size: 24px; color: var(--navy); margin-bottom: 4px; }
 .summary .meta { font-size: 13px; color: var(--sub); }
