@@ -1,0 +1,26 @@
+[
+  {
+    "id": "ups-14707",
+    "carrier": "ups",
+    "label": "UPS 14707",
+    "summary": "3 duty days \u00b7 4 legs \u00b7 SDF 757 \u00b7 TAFB 54:08",
+    "note": "Deadheads to CLE, a long layover, then two night duties through PHL and CAE home to SDF. Transcribed from a real Trip Board on 2026-09-13.",
+    "text": "Trip Details - 1470 - SDF 757\nEqp  Date     Pairing  Flt   Pos  Dep  (L)  Z      Arr  (L)  Z      Blk   Duty   Cr     L/O\nDH   9/13/26  14707    5442  CPT  SDF  (SU17)21:32  CLE  (18)22:36  0:00\n                                                                    0:00  2:19   4:00M  25:53\n     9/15/26  14707    1445  CPT  CLE  (MO21)01:44  PHL  (22)02:58  1:14\n     9/15/26  14707    1198  CPT  PHL  (TU03)07:12  CAE  (04)08:40  1:28\n                                                                    2:42  8:11   5:27E  15:16\n     9/16/26  14707    1291  CPT  CAE  (TU21)01:11  SDF  (22)02:25  1:14\n                                                                    1:14  2:29   4:00M  0:00\nCredit: 14:26T  Out Credit: 0:00  Blk: 3:56  Prem: $0.00  PDiem: $189.47  TAFB: 54:08  Duty Days: 3\n"
+  },
+  {
+    "id": "ups-11203",
+    "carrier": "ups",
+    "label": "UPS 11203",
+    "summary": "6 duty days \u00b7 14 legs \u00b7 SDF 757 \u00b7 TAFB 134:27",
+    "note": "Four consecutive nights, back-to-back RFD\u2013SAT turns, finishing with a westbound pattern into ONT.",
+    "text": "Trip Details - 1120 - SDF 757\nEqp  Date     Pairing  Flt   Pos  Dep  (L)  Z      Arr  (L)  Z      Blk   Duty   Cr     L/O\n     8/9/26   11203    CML   CPT  SDF  (SU11)15:17  ATL  (12)16:45  0:00\n     8/9/26   11203    CML   CPT  ATL  (SU14)18:54  IAD  (16)20:42  0:00\n                                                                    0:00  6:40   4:00M  25:33\n     8/10/26  11203    9717  CPT  IAD  (MO19)23:30  SYR  (20)00:29  0:59\n     8/11/26  11203    1139  CPT  SYR  (MO21)01:45  SDF  (23)03:35  1:50\n     8/11/26  11203    616   CPT  SDF  (TU01)05:15  RFD  (01)06:25  1:10\n                                                                    3:59  8:10   4:05D  12:15\n     8/11/26  11203    5758  CPT  RFD  (TU14)19:55  SAT  (17)22:26  2:31\n     8/12/26  11203    783   CPT  SAT  (TU21)02:32  RFD  (23)04:57  2:25\n                                                                    4:56  10:17  5:09D  13:43\n     8/12/26  11203    5758  CPT  RFD  (WE14)19:55  SAT  (17)22:26  2:31\n     8/13/26  11203    783   CPT  SAT  (WE21)02:32  RFD  (23)04:57  2:25\n                                                                    4:56  10:17  5:09D  12:55\n     8/13/26  11203    2986  CPT  RFD  (TH14)19:07  PDX  (15)22:56  3:49\n     8/14/26  11203    2986  CPT  PDX  (TH17)00:13  BFI  (18)01:03  0:50\n     8/14/26  11203    983   CPT  BFI  (TH19)02:50  ONT  (22)05:13  2:23\n                                                                    7:02  11:21  7:02L  11:32\n     8/14/26  11203    2190  CPT  ONT  (FR11)18:00  PHL  (18)22:48  4:48\n     8/15/26  11203    1189  CPT  PHL  (FR22)02:43  SDF  (00)04:29  1:46\n                                                                    6:34  11:44  6:34L  0:00\nCredit: 35:51T  Out Credit: 0:00  Blk: 27:27  Prem: $0.00  PDiem: $470.58  TAFB: 134:27  Duty Days: 6\n"
+  },
+  {
+    "id": "ups-25172",
+    "carrier": "ups",
+    "label": "UPS 25172",
+    "summary": "5 duty days \u00b7 9 legs \u00b7 SDF 757 \u00b7 TAFB 107:22",
+    "note": "Opens with three deadheads across the country, then flies the trip home over four nights.",
+    "text": "Trip Details - 2517 - SDF 757\nEqp  Date     Pairing  Flt   Pos  Dep  (L)  Z      Arr  (L)  Z      Blk   Duty   Cr     L/O\n     8/2/26   25172    CML   CPT  SDF  (SU15)19:54  DFW  (17)22:16  0:00\n     8/3/26   25172    CML   CPT  DFW  (SU19)00:28  SFO  (21)04:10  0:00\nDH   8/3/26   25172    8888  CPT  SFO  (SU21)04:25  OAK  (22)05:40  0:00\n                                                                    0:00  10:46  6:04L  30:55\n     8/4/26   25172    2941  CPT  OAK  (TU06)13:35  PHL  (14)18:35  5:00\n                                                                    5:00  6:15   5:00L  11:32\n     8/5/26   25172    1284  CPT  PHL  (WE03)07:22  CLT  (04)08:46  1:24\n     8/5/26   25172    5273  CPT  CLT  (WE08)12:40  RFD  (09)14:35  1:55\n                                                                    3:19  8:28   5:39E  15:44\n     8/6/26   25172    846   CPT  RFD  (TH02)07:34  SLC  (04)10:29  2:55\n     8/6/26   25172    9843  CPT  SLC  (TH05)11:30  DEN  (06)12:50  1:20\n                                                                    4:15  6:31   4:21E  13:29\nDH   8/7/26   25172    801   CPT  DEN  (TH21)03:34  SDF  (02)06:01  0:00\n                                                                    0:00  3:42   4:00M  0:00\nCredit: 28:38T  Out Credit: 0:00  Blk: 12:34  Prem: $0.00  PDiem: $375.78  TAFB: 107:22  Duty Days: 5\n"
+  }
+]

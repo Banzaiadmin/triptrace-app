@@ -1,0 +1,38 @@
+# Cloudflare Pages reads this automatically.
+
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  X-Frame-Options: DENY
+  Permissions-Policy: geolocation=(), microphone=(), camera=()
+
+# The shell is versioned by the ?v= query in index.html, so the assets themselves are immutable.
+# Bump ASSET_VERSION in sw.js and the ?v= in index.html together on any deploy that changes them.
+/app.js
+  Cache-Control: public, max-age=31536000, immutable
+/styles.css
+  Cache-Control: public, max-age=31536000, immutable
+
+# The on-device core is imported by unversioned module specifiers, so it must revalidate too
+# (ETags make that cheap). Same for the sample pairings the app loads without a server.
+/core/*
+  Cache-Control: no-cache
+/samples.json
+  Cache-Control: no-cache
+
+# HTML and the service worker must revalidate, or a deploy never reaches an installed app.
+/
+  Cache-Control: public, max-age=0, must-revalidate
+/index.html
+  Cache-Control: public, max-age=0, must-revalidate
+/sw.js
+  Cache-Control: no-cache
+
+/icon-192.png
+  Cache-Control: public, max-age=604800
+/icon-512.png
+  Cache-Control: public, max-age=604800
+/apple-touch-icon.png
+  Cache-Control: public, max-age=604800
+/manifest.webmanifest
+  Cache-Control: public, max-age=3600
