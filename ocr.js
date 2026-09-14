@@ -113,12 +113,49 @@ export function cleanup(text) {
       // O in MO into a zero, reads SU as "Sul", and drops a stray "u" or "@" in. Rebuild it from
       // whatever came back, validating the day code against the seven that exist.
       .replace(/\(([A-Za-z0-9@]*?)([0-9OoIl@]{1,2})\)/g, (_, head, hh) => `(${dayCode(head)}${digits(hh)})`)
-      .replace(/\b([0-9OoIl@]{1,2})[:.]([0-9OoIl@]{2})\b/g, (_, h, mm) =>  // 1O:46 / 10.46 -> 10:46
-        `${digits(h)}:${digits(mm)}`)
+      // 1O:46 / 10.46 -> 10:46, but money keeps its decimal point: "Prem: $0.00" is not a time.
+      // Written with a capture rather than a lookbehind, which iOS Safari only learned in 16.4.
+      .replace(/(\$?)\b([0-9OoIl@]{1,2})[:.]([0-9OoIl@]{2})\b/g, (whole, money, h, mm) =>
+        (money ? whole : `${digits(h)}:${digits(mm)}`))
       .replace(/(\d)\s*\/\s*(\d)/g, "$1/$2")
+      // A pairing id read as currency: "Trip Details - $5100" and "$51001" in the Pairing column.
+      // Real money on this screen always carries cents, so the decimal keeps PDiem and Prem safe.
+      .replace(/\$(\d{4,6})\b(?!\.\d)/g, "S$1")
       .replace(/\s+$/g, ""))
-    .filter((line) => line.trim().length)
+    .map(repairSummaryRow)
+    // A Trip Board line is never one or two stray letters. "EE" is the Eqp column's header
+    // bleeding through, and it lands in missing_data as an unparsed line if it survives.
+    .filter((line) => line.trim().length && !/^[A-Za-z]{1,2}$/.test(line.trim()))
     .join("\n");
+}
+
+/**
+ * Repair the duty-totals row, which is the one line with no words to anchor on.
+ *
+ * It prints Blk, Duty, Cr and L/O as bare times, so a dropped colon turns 5:44 into 544 and the
+ * Cr suffix letter reads as punctuation ("4:29L" -> "4:29."). Either one makes the whole row
+ * unparseable, and losing it costs a duty period its length and the layover that follows.
+ *
+ * The repair is deliberately confined to lines that are nothing but times and short digit runs:
+ * a flight number is also three digits, so this must never run where a leg row could match.
+ */
+function repairSummaryRow(line) {
+  const trimmed = line.trim();
+  if (!trimmed) return line;
+  const tokens = trimmed.split(/\s+/);
+  if (tokens.length < 3 || tokens.length > 5) return line;
+  const timeish = /^\d{1,3}:\d{2}[A-Za-z.]?$/;
+  const bareRun = /^\d{3,4}[A-Za-z.]?$/;
+  if (!tokens.every((t) => timeish.test(t) || bareRun.test(t))) return line;
+  if (tokens.filter((t) => timeish.test(t)).length < 2) return line;   // needs real times to anchor
+
+  return tokens.map((t) => {
+    const suffix = /[A-Za-z.]$/.test(t) ? t.slice(-1) : "";
+    const body = suffix ? t.slice(0, -1) : t;
+    const fixed = body.includes(":") ? body : `${body.slice(0, -2)}:${body.slice(-2)}`;
+    // The Cr column's L/D/M suffix is what the period actually was; anything else is dropped.
+    return suffix === "." ? `${fixed}L` : fixed + suffix;
+  }).join(" ");
 }
 
 const DAY_CODES = new Set(["MO", "TU", "WE", "TH", "FR", "SA", "SU"]);

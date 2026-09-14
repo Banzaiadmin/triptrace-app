@@ -767,6 +767,10 @@ export const STATIONS = Object.freeze({
     "America/Los_Angeles",
     "US"
   ],
+  "MHR": [
+    "America/Los_Angeles",
+    "US"
+  ],
   "MHT": [
     "America/New_York",
     "US"

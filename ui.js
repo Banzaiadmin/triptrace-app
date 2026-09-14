@@ -12,13 +12,45 @@
  * Where the pilot is right now is shown by position on the chart, not by a made-up percentage.
  */
 
-import { traceModel, renderTrace, sparkline, bandFor, bandColor, bandVar } from "./trace.js?v=20";
+import { traceModel, renderTrace, sparkline, bandFor, bandColor, bandVar, EFF_THRESHOLD } from "./trace.js?v=21";
 
-const V = "20";
+const V = "21";
 const $ = (id) => document.getElementById(id);
 const LAST_KEY = "triptrace.last";
 const REVISIONS_KEY = "triptrace.revisions";
 const THEME_KEY = "triptrace.theme";
+const TZ_KEY = "triptrace.station-tz";
+const COMMUTE_KEY = "triptrace.commute";
+
+/**
+ * How the pilot reached base for duty day 1. The Trip Board cannot show it and the parser files it
+ * under `no_commute_info`, so it is asked before the analysis rather than explained afterwards.
+ * Only the long answer changes a number, and it changes it the one honest way available: as
+ * workload, through the same "Long commute" condition the log uses.
+ */
+const COMMUTE_CHOICES = [
+  { id: "based", label: "I live in base", factor: false,
+    note: "No commute before duty day 1 — the pilot lives in base." },
+  { id: "short", label: "Short drive", factor: false,
+    note: "A short drive to base before duty day 1." },
+  { id: "long", label: "Long drive or a flight", factor: true,
+    note: "A long commute to base before duty day 1, counted as workload." },
+  { id: "night", label: "Travelled overnight", factor: true,
+    note: "Overnight travel to base before duty day 1, counted as workload." },
+];
+
+// Enough of the world for a UPS network, and the pilot can always pick the closest match.
+const TZ_CHOICES = [
+  ["America/New_York", "US Eastern"], ["America/Chicago", "US Central"],
+  ["America/Denver", "US Mountain"], ["America/Phoenix", "US Arizona (no DST)"],
+  ["America/Los_Angeles", "US Pacific"], ["America/Anchorage", "Alaska"],
+  ["Pacific/Honolulu", "Hawaii"], ["America/Toronto", "Canada Eastern"],
+  ["America/Vancouver", "Canada Pacific"], ["America/Mexico_City", "Mexico City"],
+  ["America/Sao_Paulo", "Brazil"], ["Europe/London", "UK"], ["Europe/Paris", "Central Europe"],
+  ["Europe/Istanbul", "Turkey"], ["Asia/Dubai", "Gulf"], ["Asia/Kolkata", "India"],
+  ["Asia/Shanghai", "China"], ["Asia/Hong_Kong", "Hong Kong"], ["Asia/Seoul", "Korea"],
+  ["Asia/Tokyo", "Japan"], ["Australia/Sydney", "Eastern Australia"], ["UTC", "UTC"],
+];
 
 const BAC_TEXT = {
   green: "negligible impairment equivalence",
@@ -41,6 +73,11 @@ const state = {
   sleepVendor: null,
   tab: "trip",
   scope: "trip",
+  series: { effectiveness: true, reservoir: false },
+  bands: false,
+  localClock: false,
+  stationTz: {},        // IATA -> IANA, supplied by the pilot for stations the table lacks
+  commute: null,        // null = not asked yet
   installPrompt: null,
 };
 
@@ -256,6 +293,7 @@ function renderAll() {
   $("tabbar").hidden = false;
   $("trip-pill").hidden = false;
   state.tmodel = traceModel(t);          // must precede the pill: its fallback reads this model
+  renderStationBanner();
   const lowPct = t.outputs?.trip_min_effectiveness_pct ?? state.tmodel?.lowest?.pct ?? null;
   $("trip-pill").innerHTML = `<b>${esc(t.pairing?.pairing_id ?? "Trip")}</b>${
     lowPct === null ? "" : ` · <span style="color:${bandColor(lowPct)}">${esc(pct(lowPct))}</span>`}`;
@@ -364,12 +402,94 @@ function renderScopes() {
   }
 }
 
+/** The domicile's zone is the one "local" a whole-trip axis can honestly speak. */
+const axisTz = () => (state.localClock
+  ? (trace()?.meta?.domicile_tz ?? Intl.DateTimeFormat().resolvedOptions().timeZone)
+  : null);
+
 function drawTrace() {
   if (!state.tmodel) return;
   renderTrace($("trace-chart"), state.tmodel, {
     scope: state.scope,
     now: Date.now(),
     width: $("trace-scroll").clientWidth || 340,
+    series: state.series,
+    bands: state.bands,
+    tzName: axisTz(),
+  });
+  resetReadout();
+  attachScrub();
+}
+
+/** The chart's resting caption: what the whole view is showing. */
+function resetReadout() {
+  const m = state.tmodel;
+  if (!m) return;
+  const low = m.lowest;
+  const b = bandFor(low?.pct ?? 100);
+  $("trace-readout").innerHTML = `
+    <div class="rv" style="color:${bandVar(b.key)}">${esc(pct(low?.pct))} lowest · ${esc(b.label)}</div>
+    <div class="rl">${esc(low?.label ?? "")} · drag across the chart to read any point</div>`;
+}
+
+/**
+ * Scrub the chart. The marker snaps to points the model actually produced — never to a value
+ * interpolated between them — so every number this readout shows is one the engine computed.
+ */
+function attachScrub() {
+  const host = $("trace-chart");
+  const geom = host._trace;
+  const svg = host.querySelector("svg");
+  if (!geom || !svg || !geom.points.length) return;
+
+  const layer = document.createElementNS("http://www.w3.org/2000/svg", "g");
+  svg.appendChild(layer);
+
+  const show = (clientX) => {
+    const box = svg.getBoundingClientRect();
+    const px = (clientX - box.left) * (svg.viewBox.baseVal.width / box.width);
+    let best = geom.points[0], bestD = Infinity;
+    for (const p of geom.points) {
+      const d = Math.abs(geom.x(p.t) - px);
+      if (d < bestD) { bestD = d; best = p; }
+    }
+    const bx = geom.x(best.t), by = geom.y(best.pct);
+    const band = bandFor(best.pct);
+    layer.innerHTML =
+      `<line class="scrub-line" x1="${bx.toFixed(1)}" x2="${bx.toFixed(1)}" y1="${geom.top}" y2="${geom.bottom}"/>`
+      + `<circle class="scrub-dot" cx="${bx.toFixed(1)}" cy="${by.toFixed(1)}" r="5.5" fill="${bandColor(best.pct)}"/>`;
+    const when = geom.tzName
+      ? `${new Date(best.t).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: geom.tzName })} local`
+      : `${zulu(new Date(best.t).toISOString())}`;
+    $("trace-readout").innerHTML = `
+      <div class="rv" style="color:${bandVar(band.key)}">${esc(pct(best.pct))} ${esc(band.label)}${
+        best.res !== null && best.res !== undefined ? ` <span class="rl">· reservoir ${esc(pct(best.res))}</span>` : ""}</div>
+      <div class="rl">${esc(best.label ?? "")} · ${esc(when)}</div>`;
+  };
+
+  const end = () => { layer.innerHTML = ""; resetReadout(); };
+  svg.style.touchAction = "pan-x";
+  svg.addEventListener("pointerdown", (e) => { svg.setPointerCapture?.(e.pointerId); show(e.clientX); });
+  svg.addEventListener("pointermove", (e) => { if (e.buttons) show(e.clientX); });
+  svg.addEventListener("pointerup", end);
+  svg.addEventListener("pointercancel", end);
+  svg.addEventListener("pointerleave", end);
+}
+
+for (const b of document.querySelectorAll("#trace-ctl .ctl")) {
+  b.addEventListener("click", () => {
+    const on = b.getAttribute("aria-pressed") !== "true";
+    const key = b.dataset.s;
+    if (key === "bands") state.bands = on;
+    else if (key === "clock") state.localClock = on;
+    else {
+      // One series has to stay on, or the chart is an empty box.
+      const other = key === "effectiveness" ? "reservoir" : "effectiveness";
+      if (!on && !state.series[other]) return;
+      state.series[key] = on;
+    }
+    b.setAttribute("aria-pressed", String(on));
+    drawTrace();
   });
 }
 let resizeTimer;
@@ -637,7 +757,13 @@ function hypnogram(rest, wocl) {
 function renderDoc() {
   const r = report();
   const t = trace();
-  const gaps = t.missing_data ?? [];
+  // An answered question is no longer a gap. The parser cannot know the pilot told us, so the
+  // answer is substituted here — it is their statement being shown back, not a model input.
+  const choice = COMMUTE_CHOICES.find((c) => c.id === state.commute);
+  const gaps = (t.missing_data ?? []).map((g) =>
+    (g.kind === "no_commute_info" && choice
+      ? { ...g, kind: "answered", detail: choice.note }
+      : g));
   $("doc-body").innerHTML = `
     <section class="block" style="margin-top:22px">
       <div class="block-head"><h2>How this trip is built</h2></div>
@@ -940,10 +1066,15 @@ async function rerun() {
   working("Re-running with what you logged");
   try {
     await engineReady;
-    state.payload = engine.analyzeText(state.payload.transcript, {
+    const transcript = state.payload.transcript;
+    const wasOcr = Boolean(state.payload.ocr);
+    state.payload = engine.analyzeText(transcript, {
       carrier: state.carrier, actualSleep: state.sleep, revisions: revisionsPayload(),
+      factors: commuteFactors(),
+      stationTzOverrides: Object.keys(state.stationTz).length ? state.stationTz : null,
     });
-    state.payload.transcript = state.payload.transcript ?? "";
+    state.payload.transcript = transcript;
+    state.payload.ocr = wasOcr;
     persist();
     renderAll();
   } catch (err) {
@@ -1058,6 +1189,8 @@ async function analyzeTranscript(text, carrier, { ocr = false } = {}) {
   if (!engine) throw new Error("The analysis core did not load. Reload the app and try again.");
   const payload = engine.analyzeText(text, {
     carrier, actualSleep: state.sleep, revisions: revisionsPayload(),
+    factors: commuteFactors(),
+    stationTzOverrides: Object.keys(state.stationTz).length ? state.stationTz : null,
   });
   payload.transcript = text;
   payload.ocr = ocr;
@@ -1234,10 +1367,82 @@ if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").catch(() => { /* offline shell is optional */ });
 }
 
+// ── How the pilot got to base, and stations the table has never seen ───────
+
+function renderCommute() {
+  $("commute-chips").innerHTML = COMMUTE_CHOICES.map((c) =>
+    `<button class="chip" data-c="${c.id}" aria-pressed="${state.commute === c.id}">${esc(c.label)}</button>`).join("");
+  for (const b of $("commute-chips").querySelectorAll(".chip")) {
+    b.addEventListener("click", () => {
+      state.commute = state.commute === b.dataset.c ? null : b.dataset.c;
+      try { localStorage.setItem(COMMUTE_KEY, state.commute ?? ""); } catch (_) { /* fine */ }
+      renderCommute();
+    });
+  }
+}
+
+/** The only commute answers that move a number do it as workload, like any other condition. */
+const commuteFactors = () => {
+  const choice = COMMUTE_CHOICES.find((c) => c.id === state.commute);
+  return choice?.factor ? ["Long commute"] : [];
+};
+
+/** Stations the parser could not place, read straight out of what it reported. */
+function unknownStations() {
+  const out = new Set();
+  for (const m of trace()?.missing_data ?? []) {
+    const hit = /Station ([A-Z0-9]{3,4}) is not in the timezone table/.exec(m.detail ?? "");
+    if (hit) out.add(hit[1]);
+  }
+  return [...out];
+}
+
+function renderStationBanner() {
+  const unknown = unknownStations();
+  $("tz-note").hidden = unknown.length === 0;
+  if (!unknown.length) return;
+  $("tz-note-text").textContent = unknown.length === 1
+    ? `${unknown[0]} is not in the app's table, so its legs have no local clock.`
+    : `${unknown.join(", ")} are not in the app's table, so their legs have no local clock.`;
+}
+
+function openStationSheet() {
+  const unknown = unknownStations();
+  $("station-list").innerHTML = unknown.map((code) => `
+    <div class="station-row">
+      <div class="code">${esc(code)}</div>
+      <select data-code="${esc(code)}">
+        <option value="">Choose a time zone…</option>
+        ${TZ_CHOICES.map(([tz, label]) =>
+          `<option value="${esc(tz)}" ${state.stationTz[code] === tz ? "selected" : ""}>${esc(label)} · ${esc(tz)}</option>`).join("")}
+      </select>
+    </div>`).join("");
+  openSheet("station-sheet");
+}
+
+$("tz-fix").addEventListener("click", openStationSheet);
+$("station-save").addEventListener("click", async () => {
+  for (const sel of $("station-list").querySelectorAll("select")) {
+    if (sel.value) state.stationTz[sel.dataset.code] = sel.value;
+  }
+  try { localStorage.setItem(TZ_KEY, JSON.stringify(state.stationTz)); } catch (_) { /* fine */ }
+  closeSheet("station-sheet");
+  await rerun();
+});
+$("menu-commute").addEventListener("click", async () => {
+  closeSheet("menu-sheet");
+  setSource(state.source);
+  openSheet("import-sheet");
+  requestAnimationFrame(moveSegIndicator);
+});
+
 // ── Boot ────────────────────────────────────────────────────────────────────
 
 (async function boot() {
   restoreRevisions();
+  try { state.stationTz = JSON.parse(localStorage.getItem(TZ_KEY) ?? "{}"); } catch (_) { state.stationTz = {}; }
+  try { state.commute = localStorage.getItem(COMMUTE_KEY) || null; } catch (_) { state.commute = null; }
+  renderCommute();
   renderVendors();
   loadSamples();
   await engineReady;

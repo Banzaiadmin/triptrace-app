@@ -13,7 +13,14 @@
  * ever printed, and every figure the app displays comes from the engine.
  */
 
+import { MODEL_PARAMS } from "./core/constants.js";
+
 const HOUR = 3600e3;
+
+// The lines the curve is read against are the model's, not the chart's: the Combined Capacity
+// white paper puts the fatigue criterion at 77% effectiveness and the reservoir floor at 75%.
+export const EFF_THRESHOLD = MODEL_PARAMS.effectiveness_fatigue_threshold;
+export const RES_THRESHOLD = MODEL_PARAMS.reservoir_fatigue_threshold;
 
 const BANDS = [
   { min: 90, key: "green",  label: "Normal" },
@@ -29,6 +36,9 @@ export const bandColor = (pct) => bandVar(bandFor(pct).key);
 const ms = (iso) => (iso ? Date.parse(iso) : null);
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const localHM = (t, tz) => new Date(t).toLocaleTimeString([], {
+  hour: "2-digit", minute: "2-digit", hour12: false, timeZone: tz,
+});
 const zulu = (t) => `${String(new Date(t).getUTCHours()).padStart(2, "0")}:${String(new Date(t).getUTCMinutes()).padStart(2, "0")}`;
 const dayName = (t) => new Date(t).toLocaleDateString(undefined,
   { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" });
@@ -54,6 +64,9 @@ export function traceModel(trace) {
       startPct: l.effectiveness?.start_pct ?? null,
       minPct: l.effectiveness?.min_pct ?? null,
       endPct: l.effectiveness?.end_pct ?? null,
+      startRes: l.effectiveness?.reservoir_pct ?? null,
+      minRes: l.effectiveness?.reservoir_pct ?? null,
+      endRes: l.effectiveness?.reservoir_pct ?? null,
       minAt: ms(l.effectiveness?.min_at_utc),
     }));
     return {
@@ -66,6 +79,10 @@ export function traceModel(trace) {
       startPct: eff.start_pct ?? null,
       minPct: eff.min_pct ?? null,
       endPct: eff.end_pct ?? null,
+      startRes: eff.reservoir_pct ?? null,
+      endRes: eff.reservoir_pct ?? null,
+      combined: eff.combined_capacity ?? null,
+      workload: eff.workload_norm ?? null,
       minAt: ms(eff.min_at_utc),
       minWhere: eff.min_location ?? "",
       band: eff.band ?? null,
@@ -95,20 +112,23 @@ export function traceModel(trace) {
   // release value and the climb happens across the modeled sleep window, which is where the model
   // puts it too.
   const pts = [];
-  const push = (t, pct) => { if (t && pct !== null && pct !== undefined) pts.push({ t, pct }); };
+  const push = (t, pct, res, label, kind) => {
+    if (t && pct !== null && pct !== undefined) pts.push({ t, pct, res: res ?? null, label, kind });
+  };
   dutyRows.forEach((d, i) => {
-    push(d.report, d.startPct);
+    push(d.report, d.startPct, d.startRes, `D${d.day} report`, "duty");
     for (const l of d.legs) {
-      push(l.dep, l.startPct);
-      push(l.minAt, l.minPct);
-      push(l.arr, l.endPct);
+      const tag = `${l.flight}${l.deadhead ? " DH" : ""} ${l.from}–${l.to}`;
+      push(l.dep, l.startPct, l.startRes, `${tag} off`, "duty");
+      push(l.minAt, l.minPct, l.minRes, `${tag} low`, "duty");
+      push(l.arr, l.endPct, l.endRes, `${tag} on`, "duty");
     }
-    push(d.release, d.endPct);
+    push(d.release, d.endPct, d.endRes, `D${d.day} release`, "duty");
     const rest = sleepRows.find((r) => r.afterDay === d.day);
     const next = dutyRows[i + 1];
     if (rest && next) {
-      push(rest.winStart, d.endPct);
-      push(rest.winEnd, next.startPct);
+      push(rest.winStart, d.endPct, d.endRes, `${rest.station} sleep window opens`, "rest");
+      push(rest.winEnd, next.startPct, next.startRes, `${rest.station} sleep window closes`, "rest");
     }
   });
   pts.sort((a, b) => a.t - b.t);
@@ -148,7 +168,10 @@ function windowFor(model, scope) {
  * Draw the Trace. `container` is any element; it gets one <svg>.
  * Options: scope ("trip" or a day index), now (ms), width (visible px, for density only).
  */
-export function renderTrace(container, model, { scope = "trip", now = Date.now(), width = 340 } = {}) {
+export function renderTrace(container, model, {
+  scope = "trip", now = Date.now(), width = 340,
+  series = { effectiveness: true, reservoir: false }, bands = false, tzName = null,
+} = {}) {
   if (!model) { container.innerHTML = ""; return; }
 
   const win = windowFor(model, scope);
@@ -183,12 +206,29 @@ export function renderTrace(container, model, { scope = "trip", now = Date.now()
     }
   }
 
-  // Effectiveness gridlines. 75 is drawn like the others but labelled, because it is the line the
-  // whole document argues about.
-  for (const g of [100, 90, 80, 75, 65]) {
+  // Optional band shading: the five operational risk bands as horizontal zones, so the curve is
+  // read against the scale it is scored on rather than against a bare grid.
+  if (bands) {
+    const zones = [[90, 100, "green"], [85, 90, "yellow"], [80, 85, "orange"], [75, 80, "red"], [55, 75, "purple"]];
+    for (const [lo, hi, key] of zones) {
+      out.push(`<rect class="zone" fill="var(--band-${key})" x="${PAD_L}" y="${y(hi).toFixed(1)}" `
+        + `width="${(W - PAD_R - PAD_L).toFixed(1)}" height="${(y(lo) - y(hi)).toFixed(1)}"/>`);
+    }
+  }
+
+  for (const g of [100, 90, 80, 70, 60]) {
     out.push(`<line class="grid" x1="${PAD_L}" x2="${W - PAD_R}" y1="${y(g).toFixed(1)}" y2="${y(g).toFixed(1)}"/>`);
     out.push(`<text class="gridlabel" x="${PAD_L - 6}" y="${(y(g) + 3).toFixed(1)}" text-anchor="end">${g}</text>`);
   }
+
+  // The baseline the whole document argues about: the model's own fatigue criterion. Drawn as a
+  // dashed rule across the chart so every point can be read as above it or below it at a glance.
+  const baseline = (value, cls, label) => {
+    out.push(`<line class="${cls}" x1="${PAD_L}" x2="${W - PAD_R}" y1="${y(value).toFixed(1)}" y2="${y(value).toFixed(1)}"/>`);
+    out.push(`<text class="${cls}-label" x="${W - PAD_R - 3}" y="${(y(value) - 5).toFixed(1)}" text-anchor="end">${label}</text>`);
+  };
+  if (series.effectiveness) baseline(EFF_THRESHOLD, "thresh", `FATIGUE CRITERION ${EFF_THRESHOLD}%`);
+  if (series.reservoir) baseline(RES_THRESHOLD, "thresh-res", `RESERVOIR FLOOR ${RES_THRESHOLD}%`);
 
   // The curve, colour-graded along its own length so a dip through a band is visible as colour.
   const shown = model.curve.filter((p) => inWin(p.t));
@@ -202,8 +242,17 @@ export function renderTrace(container, model, { scope = "trip", now = Date.now()
 
     const line = shown.map((p, i) => `${i ? "L" : "M"}${x(p.t).toFixed(1)},${y(p.pct).toFixed(1)}`).join("");
     const base = TOP + CURVE_H;
-    out.push(`<path class="curve-fill" fill="url(#tg)" d="${line}L${x(shown[shown.length - 1].t).toFixed(1)},${base}L${x(shown[0].t).toFixed(1)},${base}Z"/>`);
-    out.push(`<path class="curve" stroke="url(#tg)" d="${line}"/>`);
+    if (series.effectiveness) {
+      out.push(`<path class="curve-fill" fill="url(#tg)" d="${line}L${x(shown[shown.length - 1].t).toFixed(1)},${base}L${x(shown[0].t).toFixed(1)},${base}Z"/>`);
+      out.push(`<path class="curve" stroke="url(#tg)" d="${line}"/>`);
+    }
+    if (series.reservoir) {
+      const res = shown.filter((p) => p.res !== null && p.res !== undefined);
+      if (res.length > 1) {
+        const rline = res.map((p, i) => `${i ? "L" : "M"}${x(p.t).toFixed(1)},${y(p.res).toFixed(1)}`).join("");
+        out.push(`<path class="curve-res" d="${rline}"/>`);
+      }
+    }
   }
 
   // Duty periods, with a tick at every leg boundary and the flown/deadhead split visible.
@@ -240,7 +289,8 @@ export function renderTrace(container, model, { scope = "trip", now = Date.now()
   const firstTick = Math.ceil(win.from / (6 * HOUR)) * 6 * HOUR;
   for (let t = firstTick; t <= win.to; t += 6 * HOUR) {
     out.push(`<line class="grid" x1="${x(t).toFixed(1)}" x2="${x(t).toFixed(1)}" y1="${AXIS_Y - 6}" y2="${AXIS_Y - 2}"/>`);
-    out.push(`<text class="gridlabel" x="${x(t).toFixed(1)}" y="${AXIS_Y + 8}" text-anchor="middle">${zulu(t)}Z</text>`);
+    out.push(`<text class="gridlabel" x="${x(t).toFixed(1)}" y="${AXIS_Y + 8}" text-anchor="middle">${
+      tzName ? `${localHM(t, tzName)}` : `${zulu(t)}Z`}</text>`);
   }
   let lastDay = null;                 // two duties can report on the same date; label it once
   for (const d of model.duties) {
@@ -274,6 +324,13 @@ export function renderTrace(container, model, { scope = "trip", now = Date.now()
 
   // Draw the line on from the start of the trip, the way a Health chart does. The dash length has
   // to come from the laid-out path, so this happens after the SVG is in the document.
+  // Hand the geometry back so the app can scrub the chart: the readout snaps to points the model
+  // actually produced, never to an interpolated value between them.
+  container._trace = {
+    x, y, win, points: model.curve.filter((p) => inWin(p.t)),
+    top: TOP, bottom: TOP + CURVE_H, tzName,
+  };
+
   const path = container.querySelector(".curve");
   if (path && !matchMedia("(prefers-reduced-motion: reduce)").matches) {
     const len = path.getTotalLength();

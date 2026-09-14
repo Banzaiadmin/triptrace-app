@@ -885,7 +885,12 @@ function buildPairing(pairingId, groups, dutyPeriods, info, allStations, overrid
       "Trip length, and a hint that a duty or layover row was misread.",
     );
   }
-  if (footerDays !== null && footerDays !== dutyPeriods.length) {
+  // The footer's "Duty Days" is not always a count of duty periods: on a pairing with a long
+  // layover it counts calendar days away from base, so a 2-duty trip spanning Sat-Tue prints 4.
+  // The arithmetic is the better witness — see the same comment in trip_board_parser.py.
+  const tafbReconciles = footerTafb !== null
+    && Math.abs(footerTafb - (summedDuty + summedLayover)) <= TOTALS_TOLERANCE_MIN;
+  if (footerDays !== null && footerDays !== dutyPeriods.length && !tafbReconciles) {
     missing.add(
       "cut_off",
       `Footer says ${footerDays} duty days but ${dutyPeriods.length} were parsed — the screenshot is likely truncated.`,

@@ -38,5 +38,13 @@
     "summary": "5 duty days \u00b7 9 legs \u00b7 SDF 757 \u00b7 TAFB 107:22",
     "note": "Opens with three deadheads across the country, then flies the trip home over four nights.",
     "text": "Trip Details - 2517 - SDF 757\nEqp  Date     Pairing  Flt   Pos  Dep  (L)  Z      Arr  (L)  Z      Blk   Duty   Cr     L/O\n     8/2/26   25172    CML   CPT  SDF  (SU15)19:54  DFW  (17)22:16  0:00\n     8/3/26   25172    CML   CPT  DFW  (SU19)00:28  SFO  (21)04:10  0:00\nDH   8/3/26   25172    8888  CPT  SFO  (SU21)04:25  OAK  (22)05:40  0:00\n                                                                    0:00  10:46  6:04L  30:55\n     8/4/26   25172    2941  CPT  OAK  (TU06)13:35  PHL  (14)18:35  5:00\n                                                                    5:00  6:15   5:00L  11:32\n     8/5/26   25172    1284  CPT  PHL  (WE03)07:22  CLT  (04)08:46  1:24\n     8/5/26   25172    5273  CPT  CLT  (WE08)12:40  RFD  (09)14:35  1:55\n                                                                    3:19  8:28   5:39E  15:44\n     8/6/26   25172    846   CPT  RFD  (TH02)07:34  SLC  (04)10:29  2:55\n     8/6/26   25172    9843  CPT  SLC  (TH05)11:30  DEN  (06)12:50  1:20\n                                                                    4:15  6:31   4:21E  13:29\nDH   8/7/26   25172    801   CPT  DEN  (TH21)03:34  SDF  (02)06:01  0:00\n                                                                    0:00  3:42   4:00M  0:00\nCredit: 28:38T  Out Credit: 0:00  Blk: 12:34  Prem: $0.00  PDiem: $375.78  TAFB: 107:22  Duty Days: 5\n"
+  },
+  {
+    "id": "ups-S51001",
+    "carrier": "ups",
+    "label": "UPS S51001",
+    "summary": "2 duty periods \u00b7 3 legs \u00b7 SDF 757 \u00b7 TAFB 81:01",
+    "note": "One leg out to Sacramento Mather, a 67:50 layover, then home through PHX. The footer says 4 duty days because the trip spans four calendar dates. Transcribed from a real Trip Board on 2026-09-14.",
+    "text": "Trip Details - S5100 - SDF 757\nEqp Date Pairing Flt Pos Dep (L) Z Arr (L) Z Blk Duty Cr L/O\n9/19/26 S51001 956 CPT SDF (SA04)08:56 MHR (06)13:25 4:29\n4:29 5:44 4:29L 67:50\n9/22/26 S51001 9866 CPT MHR (TU03)10:30 PHX (05)12:18 1:48\n9/22/26 S51001 2865 CPT PHX (TU06)13:30 SDF (12)16:42 3:12\n5:00 7:27 5:00L 0:00\nCredit: 21:36T Out Credit: 0:00 Blk: 9:29 Prem: $0.00 PDiem: $283.56 TAFB: 81:01 Duty Days: 4\n"
   }
 ]

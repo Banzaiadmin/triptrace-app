@@ -20,7 +20,7 @@
 <title>TripTrace</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-192.png">
-<link rel="stylesheet" href="ui.css?v=20">
+<link rel="stylesheet" href="ui.css?v=21">
 
 <div class="app" id="app">
 
@@ -56,6 +56,13 @@
     <!-- ══ TRIP ══════════════════════════════════════════════════════════ -->
     <section class="tab stagger" id="tab-trip" hidden>
 
+      <div class="ocr-note tz-note" id="tz-note" hidden>
+        <div><b>Missing time zone.</b> <span id="tz-note-text"></span></div>
+        <div class="ocr-actions">
+          <button class="btn btn-quiet" id="tz-fix">Set it</button>
+        </div>
+      </div>
+
       <div class="ocr-note" id="ocr-note" hidden>
         <div>
           <b>Read on this device.</b> Check the transcript against your screenshot before you trust
@@ -82,8 +89,15 @@
           <button class="link-btn" id="trace-legend-btn">What am I seeing?</button>
         </div>
         <div class="card card-flush">
+          <div class="chart-readout" id="trace-readout"></div>
           <div class="chart-scroll" id="trace-scroll">
             <div id="trace-chart"></div>
+          </div>
+          <div class="chart-ctl" id="trace-ctl">
+            <button class="ctl" data-s="effectiveness" aria-pressed="true"><span class="dot" style="background:var(--band-green)"></span>Effectiveness</button>
+            <button class="ctl" data-s="reservoir" aria-pressed="false"><span class="dot" style="background:var(--sleep)"></span>Reservoir</button>
+            <button class="ctl" data-s="bands" aria-pressed="false">Bands</button>
+            <button class="ctl" data-s="clock" aria-pressed="false">Local time</button>
           </div>
           <div class="chart-scopes" id="trace-scopes"></div>
         </div>
@@ -200,6 +214,14 @@
         <div class="chips" id="carriers"></div>
       </div>
 
+      <div class="ask">
+        <h3 class="card-h">Before you analyze</h3>
+        <p class="sub small">How you got to base is the single biggest thing the Trip Board cannot
+          show. A long drive or a positioning flight the day before starts the trip in a hole.</p>
+        <label class="sub small">Getting to base for duty day 1</label>
+        <div class="chips" id="commute-chips" style="margin-top:8px"></div>
+      </div>
+
       <p class="sub small err" id="import-error" hidden></p>
       <button class="btn btn-primary btn-lg" id="import-run" disabled>Analyze trip</button>
     </div>
@@ -244,6 +266,7 @@
     <div class="sheet-body">
       <button class="menu-row" id="menu-new">Add a different trip</button>
       <button class="menu-row" id="menu-theme">Switch to light</button>
+      <button class="menu-row" id="menu-commute">Change how you got to base</button>
       <button class="menu-row" id="menu-transcript">View or fix the transcript</button>
       <button class="menu-row" id="menu-about">What this is, and is not</button>
       <a class="menu-row" href="classic.html" style="display:block;text-decoration:none">Open the previous layout</a>
@@ -257,6 +280,25 @@
           number in this app.</p>
       </div>
       <p class="sub small install-tip" id="install-tip" hidden></p>
+    </div>
+  </div>
+</div>
+
+<div class="sheet-bg" id="station-sheet" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-label="Unknown station">
+    <div class="grabber" aria-hidden="true"></div>
+    <div class="sheet-head">
+      <h2>Which time zone?</h2>
+      <button class="icon-btn" data-close="station-sheet" aria-label="Close">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <div class="sheet-body">
+      <p class="sub small">These stations are not in the app's table, so their legs have no local
+        clock and the cross-check against the printed local hour cannot run. Set each one once and
+        it is remembered on this device.</p>
+      <div id="station-list" class="stack"></div>
+      <button class="btn btn-primary btn-lg" style="margin-top:16px" id="station-save">Re-analyze with these</button>
     </div>
   </div>
 </div>
@@ -317,4 +359,4 @@
   <p id="working-text">Reading the trip</p>
 </div>
 
-<script type="module" src="ui.js?v=20"></script>
+<script type="module" src="ui.js?v=21"></script>

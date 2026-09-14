@@ -68,12 +68,13 @@ export function analyzeText(text, {
   revisions = [],
   domicile = null,
   domicileTz = null,
+  stationTzOverrides = null,
 } = {}) {
   requireSupportedCarrier(carrier);
 
   let trace;
   try {
-    trace = parseTripBoard(text, { domicile, domicileTz });
+    trace = parseTripBoard(text, { domicile, domicileTz, stationTzOverrides });
   } catch (error) {
     if (error instanceof ParseError) throw new EngineError(error.message);
     throw error;

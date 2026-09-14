@@ -295,6 +295,18 @@ body.sheet-open .app {
 }
 .seg button.on { color: var(--ink); }
 
+.ask { margin: 18px 0 4px; padding: 14px 16px; border-radius: var(--radius);
+  background: var(--surface); border: 1px solid var(--hair-soft); }
+.ask label { display: block; margin-top: 10px; }
+.tz-note { background: color-mix(in srgb, var(--sleep) 14%, var(--surface));
+  border-color: color-mix(in srgb, var(--sleep) 32%, transparent); }
+.tz-note b { color: var(--sleep); }
+.station-row { background: var(--surface); border: 1px solid var(--hair-soft);
+  border-radius: var(--radius-sm); padding: 12px 14px; }
+.station-row .code { font-size: 15px; font-weight: 750; letter-spacing: 0.04em; }
+.station-row select { width: 100%; margin-top: 8px; padding: 10px; border-radius: 10px;
+  border: 1px solid var(--hair); background: var(--surface-2); color: var(--ink); font: inherit; }
+
 /* A transcript the device read itself is the one input worth doubting, so it says so. */
 .ocr-note {
   margin-top: 16px; padding: 14px 16px; border-radius: var(--radius);
@@ -370,6 +382,31 @@ body.sheet-open .app {
 .trace .sleep-bar { fill: var(--sleep-dim); }
 .trace .sleep-eff { fill: var(--sleep); }
 .trace .rowlabel { fill: var(--dim); font-size: 8.5px; letter-spacing: 0.1em; }
+.trace .zone { opacity: 0.07; }
+.trace .thresh { stroke: var(--band-red); stroke-width: 1.3; stroke-dasharray: 5 4; opacity: 0.8; }
+.trace .thresh-label { fill: var(--band-red); font-size: 8px; font-weight: 700; letter-spacing: 0.1em; opacity: 0.9; }
+.trace .thresh-res { stroke: var(--sleep); stroke-width: 1.3; stroke-dasharray: 5 4; opacity: 0.75; }
+.trace .thresh-res-label { fill: var(--sleep); font-size: 8px; font-weight: 700; letter-spacing: 0.1em; opacity: 0.9; }
+.trace .curve-res { stroke: var(--sleep); stroke-width: 1.9; stroke-dasharray: 2 3; opacity: 0.9; }
+.trace .scrub-line { stroke: var(--ink); stroke-width: 1; opacity: 0.55; }
+.trace .scrub-dot { stroke: var(--bg); stroke-width: 2.5; }
+
+/* The chart's own controls: series, band shading, and which clock the axis speaks. */
+.chart-ctl { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 12px 12px; }
+.ctl {
+  border: 1px solid var(--hair); background: none; color: var(--sub);
+  border-radius: 999px; padding: 5px 11px; font-size: 11.5px; font-weight: 650; cursor: pointer;
+  transition: transform var(--dur-fast) var(--ease-out), background-color var(--dur-fast), color var(--dur-fast);
+}
+.ctl:active { transform: scale(0.93); }
+.ctl[aria-pressed="true"] { background: var(--raised); color: var(--ink); border-color: var(--raised); }
+.ctl .dot { display: inline-block; width: 7px; height: 7px; border-radius: 2px; margin-right: 6px; vertical-align: baseline; }
+
+/* The scrub readout replaces the chart title while a finger is down, so nothing jumps. */
+.chart-readout { min-height: 34px; padding: 0 12px 4px; }
+.chart-readout .rv { font-size: 15px; font-weight: 700; letter-spacing: -0.01em; }
+.chart-readout .rl { font-size: 11.5px; color: var(--sub); }
+
 .trace .curve {
   stroke-width: 2.4;
   transition: stroke-dashoffset 1100ms var(--ease-soft);
