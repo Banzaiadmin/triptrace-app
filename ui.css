@@ -77,6 +77,11 @@
 
 * { box-sizing: border-box; }
 
+/* Every overlay, sheet and tab in this app is toggled with the `hidden` attribute, and the UA's
+ * `[hidden]{display:none}` loses to any class that sets `display`. Without this the working
+ * spinner never goes away. */
+[hidden] { display: none !important; }
+
 body {
   margin: 0;
   background: var(--bg);
