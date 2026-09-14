@@ -10,7 +10,7 @@
 // Bump ASSET_VERSION (and the ?v= query in index.html) on every deploy that changes app.js or
 // styles.css. Without it a browser can serve a cached shell against new HTML — which on this app
 // would mean a pilot running an old model against a new interface.
-const ASSET_VERSION = "15";
+const ASSET_VERSION = "16";
 const CACHE = `triptrace-shell-v${ASSET_VERSION}`;
 const SHELL = [
   "./",
@@ -24,11 +24,12 @@ const SHELL = [
   // samples produce a full report with no connection at all. Module imports are unversioned, so
   // the server marks core/* no-cache and this cache is replaced wholesale on a version bump.
   `samples.json?v=${ASSET_VERSION}`,
-  // The standalone app shell. Same core underneath; a different way into it.
-  "next.html",
+  // The standalone app shell.
   `ui.css?v=${ASSET_VERSION}`,
   `ui.js?v=${ASSET_VERSION}`,
   `trace.js?v=${ASSET_VERSION}`,
+  // The previous single-page UI, one tap away from the menu while the new shell settles.
+  "classic.html",
   `pdf.js?v=${ASSET_VERSION}`,
   `ocr.js?v=${ASSET_VERSION}`,
   "core/engine.js",

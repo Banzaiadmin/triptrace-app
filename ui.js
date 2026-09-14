@@ -12,9 +12,9 @@
  * Where the pilot is right now is shown by position on the chart, not by a made-up percentage.
  */
 
-import { traceModel, renderTrace, sparkline, bandFor, bandColor, bandVar } from "./trace.js?v=15";
+import { traceModel, renderTrace, sparkline, bandFor, bandColor, bandVar } from "./trace.js?v=16";
 
-const V = "15";
+const V = "16";
 const $ = (id) => document.getElementById(id);
 const LAST_KEY = "triptrace.last";
 const REVISIONS_KEY = "triptrace.revisions";
@@ -62,7 +62,16 @@ const zulu = (iso) => (iso ? `${iso.slice(11, 16)}Z` : "—");
 const localHM = (clock) => (clock?.station_local ? clock.station_local.slice(11, 16) : null);
 const dayText = (d) => (d ? new Date(`${d}T12:00:00Z`).toLocaleDateString(undefined,
   { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" }) : "");
-const pct = (v) => (v === null || v === undefined ? "—" : `${Math.round(v)}%`);
+/**
+ * Round for display, except when rounding would cross a band edge. 74.9 shown as "75%" next to
+ * the word Critical reads as a bug, and worse, it reads as the safer side of a threshold the
+ * whole document argues about. In that case show the decimal the model produced.
+ */
+const pct = (v) => {
+  if (v === null || v === undefined) return "—";
+  const r = Math.round(v);
+  return bandFor(r).key === bandFor(v).key ? `${r}%` : `${v.toFixed(1)}%`;
+};
 
 /** "2d 14h" / "6h 12m" / "18m" — a countdown a pilot reads at a glance. */
 function untilText(fromMs, toMs) {
@@ -213,7 +222,7 @@ function drawRing(value, band) {
         stroke-linecap="round" fill="none" transform="rotate(-90 108 108)"
         stroke-dasharray="${C.toFixed(1)}" stroke-dashoffset="${(reduceMotion ? C * (1 - fill) : C).toFixed(1)}"/>
       <text class="ring-num" x="108" y="104" text-anchor="middle" fill="var(--ink)" stroke="none"
-        >${Math.round(value)}<tspan>%</tspan></text>
+        >${pct(value).replace("%", "")}<tspan>%</tspan></text>
       <text class="ring-band" x="108" y="130" text-anchor="middle" fill="${color}" stroke="none"
         >${esc(band.label)}</text>
     </svg>`;
@@ -1025,6 +1034,21 @@ function restore() {
 $("open-menu").addEventListener("click", () => openSheet("menu-sheet"));
 $("trip-pill").addEventListener("click", () => openSheet("menu-sheet"));
 $("menu-new").addEventListener("click", () => { closeSheet("menu-sheet"); setSource("sample"); openSheet("import-sheet"); });
+$("menu-transcript").addEventListener("click", () => {
+  closeSheet("menu-sheet");
+  $("transcript-text").value = state.payload?.transcript ?? "";
+  $("transcript-hint").textContent = state.payload?.ocr
+    ? "This was read on the device. Check it against the screenshot, fix anything wrong, and re-analyze."
+    : "The table this analysis was built from. Fix a misread digit and re-analyze.";
+  openSheet("transcript-sheet");
+});
+$("transcript-run").addEventListener("click", async () => {
+  const text = $("transcript-text").value;
+  closeSheet("transcript-sheet");
+  try { await analyzeTranscript(text, state.carrier); }
+  catch (err) { alert(err.message); }
+  finally { done(); }
+});
 $("menu-about").addEventListener("click", () => { $("about-text").hidden = !$("about-text").hidden; });
 $("menu-clear").addEventListener("click", () => {
   state.payload = null; state.revisions = {}; state.sleep = []; state.file = null;

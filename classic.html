@@ -1,0 +1,313 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#FFFFFF">
+<meta name="color-scheme" content="light">
+<title>TripTrace</title>
+<meta name="description" content="Know your trip before it knows you. Safety analysis for professional flight crews.">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="TripTrace">
+<link rel="stylesheet" href="styles.css?v=16">
+</head>
+<body>
+
+<div class="wrap">
+
+  <nav class="nav">
+    <div class="mark">
+      <div class="wordmark"><span class="a">TRIP</span><span class="b">TRACE</span></div>
+      <span class="badge" id="build">BETA</span>
+    </div>
+    <button class="icon-btn" id="help-open" aria-label="About TripTrace">?</button>
+  </nav>
+
+  <!-- ══ INPUT ═══════════════════════════════════════════════════════════ -->
+  <section id="view-input">
+
+    <header class="hero">
+      <div class="eyebrow">For professional flight crews</div>
+      <h1>Know your trip before it knows you.</h1>
+      <p>Upload your pairing. See where the schedule runs tighter than your physiology.</p>
+    </header>
+
+    <div class="install" id="install" hidden>
+      <div class="install-text">
+        <b>Install TripTrace on this phone</b>
+        <span id="install-how">It opens full-screen from your home screen and works without a signal.</span>
+      </div>
+      <button class="chip" id="install-go" type="button">Install</button>
+      <button class="icon-btn" id="install-dismiss" aria-label="Not now">✕</button>
+    </div>
+
+    <div class="clearance">
+      <div class="cl-head">TRIPTRACE — SAFETY CLEARANCE</div>
+      <hr>
+      <div class="cl-row">CLRD TO: <b>AWARENESS</b></div>
+      <div class="cl-row" style="margin-top:4px">VIA:
+        <b class="via">UPLOAD</b> · <b class="via">ACTUALS</b> · <b class="via">REPORT</b>
+      </div>
+    </div>
+
+    <section class="card">
+      <h2>Your airline</h2>
+      <p class="sub small">Every carrier prints schedules differently, so each is read separately.
+        UPS is live; the others are staged rather than approximated.</p>
+      <div class="chips" id="carriers"></div>
+    </section>
+
+    <section class="card">
+      <h2>Your schedule</h2>
+      <p class="sub small" id="schedule-hint">Screenshot your Trip Board and add it here.</p>
+      <button class="drop" id="drop" type="button">
+        <span class="lead" id="drop-lead">Add Trip Board screenshot</span>
+        <span class="note" id="drop-note">Tap to choose · or drop</span>
+      </button>
+      <!-- iOS Safari never fires a paste event outside an editable field, so "or paste" in the
+           hint above was a promise the phone could not keep. This button reads the clipboard
+           through the async Clipboard API instead, which iOS does support behind a tap. app.js
+           reveals it only where that API exists and appends "or paste" to the hint there. -->
+      <button class="btn btn-quiet" id="paste-shot" type="button" hidden
+        style="margin-top:8px;width:100%">Paste screenshot from clipboard</button>
+      <input id="file" type="file" accept="image/png,image/jpeg,image/gif,image/webp" hidden>
+      <label class="toggle" id="ocr-toggle" hidden>
+        <input type="checkbox" id="read-on-device">
+        <span>Read the screenshot on this device instead of the service <span class="sub">· beta,
+          no account or key needed · check the transcript afterwards</span></span>
+      </label>
+      <div id="samples-block" hidden style="margin-top:14px">
+        <div class="sub small" style="margin-bottom:8px">Or open a real pairing to see how it reads:</div>
+        <div id="samples"></div>
+      </div>
+      <details class="panel" id="text-panel" style="margin-top:14px;box-shadow:none;background:transparent">
+        <summary style="padding:12px 0">Paste the table as text instead</summary>
+        <textarea id="text" rows="7" class="mono" spellcheck="false" autocapitalize="off"
+          autocorrect="off" style="margin:0"
+          placeholder="Trip Details - 1120 - SDF 757&#10;     8/9/26  11203  CML  CPT  SDF  (SU11)15:17  ATL  (12)16:45  0:00"></textarea>
+      </details>
+    </section>
+
+    <section class="card">
+      <h2>Your sleep</h2>
+      <p class="sub small">Measured sleep replaces the model's estimate. Without it every sleep
+        figure below is inferred from the schedule alone.</p>
+      <div class="chips" id="vendors" style="margin-bottom:12px"></div>
+      <button class="drop" id="sleep-drop" type="button">
+        <span class="lead" id="sleep-lead">Import sleep data</span>
+        <span class="note" id="sleep-note">Whoop, Oura, or Apple Health export · JSON</span>
+      </button>
+      <input id="sleep-file" type="file" accept=".json,application/json" hidden>
+      <div id="sleep-summary" hidden style="margin-top:12px"></div>
+    </section>
+
+    <section class="card">
+      <h2>Conditions you already know about</h2>
+      <p class="sub small">Optional, for the whole trip. Counted as workload in the Combined
+        Capacity figure on every duty day; they never change the effectiveness estimate itself.
+        Delays and day-by-day conditions are logged on the report as the trip unfolds.</p>
+      <div class="chips" id="factors" style="margin-bottom:12px"></div>
+      <textarea id="notes" rows="2"
+        placeholder='Anything else — "BOI hotel is next to the freight ramp"'></textarea>
+    </section>
+
+    <section class="card">
+      <h2>Rescheduled or revised?</h2>
+      <p class="sub small">Optional. If the trip was changed on you, note how — the report includes
+        a proposed safety write-up grounded in the science rather than the frustration.</p>
+      <div class="chips" id="resched"></div>
+    </section>
+
+    <button class="btn btn-red" id="run" disabled>Run safety report</button>
+    <p class="sub small" id="run-hint" style="text-align:center">Add a screenshot or paste your
+      schedule to run the report.</p>
+  </section>
+
+  <!-- ══ WORKING ═════════════════════════════════════════════════════════ -->
+  <section id="view-working" hidden>
+    <div class="working">
+      <div class="spinner" aria-hidden="true"></div>
+      <p class="dots" id="progress">Reading schedule…</p>
+    </div>
+  </section>
+
+  <!-- ══ ERROR ═══════════════════════════════════════════════════════════ -->
+  <section id="view-error" hidden>
+    <div class="card" style="border:1px solid var(--red)">
+      <h2>That didn't work</h2>
+      <p class="sub small" id="error-text" style="margin-bottom:0"></p>
+    </div>
+    <button class="btn btn-navy" id="error-back">Back</button>
+  </section>
+
+  <!-- ══ REPORT ══════════════════════════════════════════════════════════ -->
+  <section id="view-report" hidden>
+    <div class="report-eyebrow" id="report-eyebrow"></div>
+
+    <div class="ring" id="ring"></div>
+
+    <div class="ring-caption">
+      <div class="where" id="min-where"></div>
+      <div class="bac" id="min-bac"></div>
+      <div class="callout" id="bac-callout" hidden></div>
+    </div>
+
+    <section class="card">
+      <h2 style="margin-bottom:8px">How this trip is built</h2>
+      <p id="narrative" style="font-size:15px;line-height:1.6;margin:0"></p>
+    </section>
+
+    <section class="card">
+      <h2 style="margin-bottom:4px">By duty period</h2>
+      <p class="sub small">As the trip unfolds, open a day and log what happened. A delay moves
+        that day's timeline and shortens the layover after it; conditions count as workload. The
+        report updates on the spot.</p>
+      <div id="duties"></div>
+    </section>
+
+    <section class="card">
+      <h2 style="margin-bottom:12px">What helps</h2>
+      <ul class="bullets" id="recs"></ul>
+    </section>
+
+    <section class="card" id="watch-card">
+      <h2 style="margin-bottom:8px">Worth knowing</h2>
+      <ul class="plain" id="watch"></ul>
+    </section>
+
+    <section class="card" id="gaps-card">
+      <h2 style="margin-bottom:4px">What the model can't see</h2>
+      <p class="sub small">Every item here would change the result. It is part of the output, not a
+        footnote to it.</p>
+      <div id="gaps"></div>
+      <p class="sub tiny gaps-note" id="disclaimer"></p>
+    </section>
+
+    <button class="btn btn-navy" id="summary-open">Create safety summary</button>
+    <button class="btn btn-quiet" id="safety-open">View proposed safety report</button>
+    <button class="btn btn-quiet" id="restart">Start another trip</button>
+
+    <details class="panel" id="transcript-panel">
+      <summary>Transcript <span class="sub small" id="transcript-hint">— fix a misread digit and re-run</span></summary>
+      <textarea id="transcript" rows="12" class="mono" spellcheck="false"
+                autocapitalize="off" autocorrect="off"></textarea>
+      <button class="btn btn-quiet" id="reparse" style="margin:0">Re-run from edited transcript</button>
+    </details>
+
+    <details class="panel">
+      <summary>TripTrace JSON <span class="sub small">— the full record <span id="engine-note"></span></span></summary>
+      <button class="btn btn-quiet" id="copy-json" style="margin-bottom:10px">Copy to clipboard</button>
+      <pre class="json" id="json"></pre>
+    </details>
+  </section>
+
+  <footer>
+    <p class="sub tiny" style="margin:0">Decision support for professional flight crews — not
+      validated software, and not legal or contractual advice. The fatigue call is the pilot's
+      authority.</p>
+  </footer>
+</div>
+
+<!-- ══ SHEETS ════════════════════════════════════════════════════════════ -->
+<div class="sheet-bg" id="help-sheet" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-label="About TripTrace">
+    <div class="sheet-head">
+      <h2>About TripTrace</h2>
+      <button class="icon-btn" data-close="help-sheet" aria-label="Close">✕</button>
+    </div>
+    <div class="sheet-body">
+      <p class="sub" style="font-size:14px;line-height:1.55">
+        TripTrace reads your Trip Board, rebuilds the trip on three clocks — Zulu, station local,
+        and your body clock — then models the sleep the schedule actually allows and estimates
+        where your effectiveness bottoms out.
+      </p>
+      <div class="step">
+        <h3>1 · Pick your airline</h3>
+        <p>Each carrier's format is parsed separately. UPS is live. The others are listed so you
+          know they're coming, not because they half-work.</p>
+      </div>
+      <div class="step">
+        <h3>2 · Add your schedule</h3>
+        <p>Screenshot the Trip Board. Times are read as Zulu, cross-checked against the local-hour
+          parenthetical, and anything ambiguous is flagged rather than guessed.</p>
+      </div>
+      <div class="step">
+        <h3>3 · Add your sleep</h3>
+        <p>Import from Whoop, Oura, or an Apple Health export. Sessions are matched to layovers by
+          overlap in UTC, so it works across time zones without you telling it anything. Measured
+          sleep always overrides the model.</p>
+      </div>
+      <div class="step">
+        <h3>4 · Read your report</h3>
+        <p>The ring is the trip's lowest estimated effectiveness. Each duty period gets its own
+          trace from report to release.</p>
+      </div>
+      <div class="step">
+        <h3>5 · Proposed safety report</h3>
+        <p>A formal write-up — schedule facts, physiology with citations, and a fitness-for-duty
+          statement. Objective by design, so it reads as documentation rather than complaint.</p>
+      </div>
+      <h3 style="margin:24px 0 10px">What the colors mean</h3>
+      <div id="legend"></div>
+      <p class="sub small" style="margin-top:10px">
+        0.04 BAC is the FAR 91.17 limit for flying with alcohol on board. When a fatigue estimate
+        reaches the same impairment level, it deserves the same respect.
+      </p>
+      <div class="card" style="margin-top:20px;box-shadow:none">
+        <h3 style="font-size:14px;margin-bottom:4px">Good to know</h3>
+        <p class="sub small" style="margin:0">Estimates, not validated software. Sleep is modeled
+          unless you import measured data. Contractual minimum rest is a
+          scheduling floor, not a fitness guarantee — and a fatigue call is a normal professional
+          tool. Your own symptoms always outrank any number on this screen.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="sheet-bg" id="summary-sheet" hidden>
+  <div class="sheet sheet-wide" role="dialog" aria-modal="true" aria-label="Safety summary">
+    <div class="sheet-head no-print">
+      <div>
+        <h2>Safety summary</h2>
+        <div class="sub">One document, every number traceable to the analysis</div>
+      </div>
+      <button class="icon-btn" data-close="summary-sheet" aria-label="Close">✕</button>
+    </div>
+    <div class="sheet-body">
+      <div class="summary-actions no-print">
+        <button class="btn btn-navy" id="summary-share">Share PDF</button>
+        <button class="btn btn-quiet" id="summary-print">Print or save as PDF</button>
+        <button class="btn btn-quiet" id="summary-copy">Copy as text</button>
+        <p class="sub small" id="summary-status" style="text-align:center"></p>
+      </div>
+      <article class="summary" id="summary-doc"></article>
+    </div>
+  </div>
+</div>
+
+<div class="sheet-bg" id="safety-sheet" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-label="Proposed safety report">
+    <div class="sheet-head">
+      <div>
+        <h2>Proposed safety report</h2>
+        <div class="sub">Draft for your review — objective and science-based</div>
+      </div>
+      <button class="icon-btn" data-close="safety-sheet" aria-label="Close">✕</button>
+    </div>
+    <div class="sheet-body">
+      <pre id="safety-text"></pre>
+      <button class="btn btn-navy" id="copy-safety" style="margin-top:20px">Copy report</button>
+      <p class="sub small" id="copy-status" style="text-align:center"></p>
+      <p class="sub tiny">This draft states facts, physiology, and a professional fitness-for-duty
+        conclusion — nothing emotional, nothing accusatory. Review and edit before using it; it is
+        decision support, not legal or contractual advice.</p>
+    </div>
+  </div>
+</div>
+
+<script src="app.js?v=16"></script>
+</body>
+</html>
