@@ -20,7 +20,7 @@
 <title>TripTrace</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-192.png">
-<link rel="stylesheet" href="ui.css?v=16">
+<link rel="stylesheet" href="ui.css?v=17">
 
 <div class="app" id="app">
 
@@ -54,7 +54,18 @@
     </section>
 
     <!-- ══ TRIP ══════════════════════════════════════════════════════════ -->
-    <section class="tab" id="tab-trip" hidden>
+    <section class="tab stagger" id="tab-trip" hidden>
+
+      <div class="ocr-note" id="ocr-note" hidden>
+        <div>
+          <b>Read on this device.</b> Check the transcript against your screenshot before you trust
+          the numbers — one misread digit moves everything.
+        </div>
+        <div class="ocr-actions">
+          <button class="btn btn-quiet" id="ocr-open">Check it</button>
+          <button class="btn btn-ghost" id="ocr-dismiss">Dismiss</button>
+        </div>
+      </div>
 
       <div class="hero">
         <div class="hero-ring" id="hero-ring"></div>
@@ -92,14 +103,14 @@
 
     <!-- ══ NOW ═══════════════════════════════════════════════════════════ -->
     <section class="tab" id="tab-now" hidden>
-      <div id="now-body" class="stack"></div>
+      <div id="now-body" class="stack stagger"></div>
       <button class="btn btn-primary btn-lg block-btn" id="now-log">Log what's happening</button>
     </section>
 
     <!-- ══ REST ══════════════════════════════════════════════════════════ -->
     <section class="tab" id="tab-rest" hidden>
       <div class="block-head sticky-head"><h2>Sleep by layover</h2></div>
-      <div id="rest-body" class="stack"></div>
+      <div id="rest-body" class="stack stagger"></div>
       <section class="block">
         <div class="card">
           <h3 class="card-h">Measured sleep</h3>
@@ -116,7 +127,7 @@
 
     <!-- ══ DOC ═══════════════════════════════════════════════════════════ -->
     <section class="tab" id="tab-doc" hidden>
-      <div id="doc-body" class="stack"></div>
+      <div id="doc-body" class="stack stagger"></div>
     </section>
 
   </main>
@@ -145,6 +156,7 @@
 
 <div class="sheet-bg" id="import-sheet" hidden>
   <div class="sheet" role="dialog" aria-modal="true" aria-label="Add a trip">
+    <div class="grabber" aria-hidden="true"></div>
     <div class="sheet-head">
       <h2>Add a trip</h2>
       <button class="icon-btn" data-close="import-sheet" aria-label="Close">
@@ -153,6 +165,7 @@
     </div>
     <div class="sheet-body">
       <div class="seg" id="import-seg">
+        <span class="seg-ind" id="seg-ind"></span>
         <button data-src="sample" class="on">Samples</button>
         <button data-src="shot">Screenshot</button>
         <button data-src="text">Paste text</button>
@@ -195,6 +208,7 @@
 
 <div class="sheet-bg" id="duty-sheet" hidden>
   <div class="sheet" role="dialog" aria-modal="true" aria-label="Duty day">
+    <div class="grabber" aria-hidden="true"></div>
     <div class="sheet-head">
       <h2 id="duty-sheet-title">Duty day</h2>
       <button class="icon-btn" data-close="duty-sheet" aria-label="Close">
@@ -207,6 +221,7 @@
 
 <div class="sheet-bg" id="log-sheet" hidden>
   <div class="sheet" role="dialog" aria-modal="true" aria-label="Log what happened">
+    <div class="grabber" aria-hidden="true"></div>
     <div class="sheet-head">
       <h2>Log what happened</h2>
       <button class="icon-btn" data-close="log-sheet" aria-label="Close">
@@ -219,6 +234,7 @@
 
 <div class="sheet-bg" id="menu-sheet" hidden>
   <div class="sheet sheet-short" role="dialog" aria-modal="true" aria-label="Menu">
+    <div class="grabber" aria-hidden="true"></div>
     <div class="sheet-head">
       <h2>TripTrace</h2>
       <button class="icon-btn" data-close="menu-sheet" aria-label="Close">
@@ -247,6 +263,7 @@
 
 <div class="sheet-bg" id="transcript-sheet" hidden>
   <div class="sheet" role="dialog" aria-modal="true" aria-label="Transcript">
+    <div class="grabber" aria-hidden="true"></div>
     <div class="sheet-head">
       <h2>Transcript</h2>
       <button class="icon-btn" data-close="transcript-sheet" aria-label="Close">
@@ -263,6 +280,7 @@
 
 <div class="sheet-bg" id="legend-sheet" hidden>
   <div class="sheet sheet-short" role="dialog" aria-modal="true" aria-label="Reading the Trace">
+    <div class="grabber" aria-hidden="true"></div>
     <div class="sheet-head">
       <h2>Reading the Trace</h2>
       <button class="icon-btn" data-close="legend-sheet" aria-label="Close">
@@ -275,6 +293,7 @@
 
 <div class="sheet-bg" id="summary-sheet" hidden>
   <div class="sheet sheet-wide" role="dialog" aria-modal="true" aria-label="Safety summary">
+    <div class="grabber" aria-hidden="true"></div>
     <div class="sheet-head">
       <h2>Safety summary</h2>
       <button class="icon-btn" data-close="summary-sheet" aria-label="Close">
@@ -298,4 +317,4 @@
   <p id="working-text">Reading the trip</p>
 </div>
 
-<script type="module" src="ui.js?v=16"></script>
+<script type="module" src="ui.js?v=17"></script>

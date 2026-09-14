@@ -12,9 +12,9 @@
  * Where the pilot is right now is shown by position on the chart, not by a made-up percentage.
  */
 
-import { traceModel, renderTrace, sparkline, bandFor, bandColor, bandVar } from "./trace.js?v=16";
+import { traceModel, renderTrace, sparkline, bandFor, bandColor, bandVar } from "./trace.js?v=17";
 
-const V = "16";
+const V = "17";
 const $ = (id) => document.getElementById(id);
 const LAST_KEY = "triptrace.last";
 const REVISIONS_KEY = "triptrace.revisions";
@@ -51,6 +51,22 @@ const engineReady = import(`./core/engine.js?v=${V}`)
   .catch((e) => { console.error("engine unavailable", e); });
 
 const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+
+/**
+ * Count a number up into place. Apple's fitness rings do this and it is not decoration: a value
+ * that arrives over half a second reads as measured, where one that snaps in reads as printed.
+ */
+function countTo(node, to, { decimals = 0, duration = 900, suffix = "" } = {}) {
+  if (reduceMotion) { node.textContent = to.toFixed(decimals) + suffix; return; }
+  const start = performance.now();
+  const step = (now) => {
+    const t = Math.min(1, (now - start) / duration);
+    const eased = 1 - Math.pow(1 - t, 3);
+    node.textContent = (to * eased).toFixed(decimals) + suffix;
+    if (t < 1) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
 
 // ── Formatting ──────────────────────────────────────────────────────────────
 
@@ -100,33 +116,113 @@ $("menu-theme").addEventListener("click", () =>
 
 // ── Sheets ──────────────────────────────────────────────────────────────────
 
-const openSheet = (id) => { $(id).hidden = false; };
-const closeSheet = (id) => { $(id).hidden = true; };
+function syncSheetState() {
+  const open = [...document.querySelectorAll(".sheet-bg")].some((s) => !s.hidden);
+  document.body.classList.toggle("sheet-open", open);
+}
+const openSheet = (id) => {
+  const sheet = $(id).querySelector(".sheet");
+  sheet.classList.remove("dragging", "settling");
+  sheet.style.transform = "";
+  $(id).hidden = false;
+  syncSheetState();
+};
+const closeSheet = (id) => { $(id).hidden = true; syncSheetState(); };
+
+/**
+ * Drag a sheet down to dismiss it. Past a third of its height, or on a decisive flick, it goes;
+ * otherwise it springs back. Pointer events cover touch, pen and mouse in one path.
+ */
+function makeDraggable(sheet, bgId) {
+  let startY = 0, lastY = 0, lastT = 0, dy = 0, active = false;
+  const grab = sheet.querySelector(".grabber");
+  const canStart = (e) => {
+    const body = sheet.querySelector(".sheet-body");
+    // Only take the gesture when the content is already at its top, or the list would not scroll.
+    return e.target === grab || e.target.closest(".sheet-head") || (body && body.scrollTop <= 0);
+  };
+  sheet.addEventListener("pointerdown", (e) => {
+    if (e.pointerType === "mouse" && e.target !== grab && !e.target.closest(".sheet-head")) return;
+    if (!canStart(e)) return;
+    active = true; startY = lastY = e.clientY; lastT = performance.now(); dy = 0;
+    sheet.classList.add("dragging");
+  });
+  sheet.addEventListener("pointermove", (e) => {
+    if (!active) return;
+    dy = Math.max(0, e.clientY - startY);
+    if (dy > 4) sheet.setPointerCapture?.(e.pointerId);
+    lastY = e.clientY; lastT = performance.now();
+    sheet.style.transform = `translateY(${dy}px)`;
+  });
+  const end = () => {
+    if (!active) return;
+    active = false;
+    sheet.classList.remove("dragging");
+    sheet.classList.add("settling");
+    const flick = (performance.now() - lastT) < 220 && dy > 60;
+    if (dy > sheet.offsetHeight * 0.3 || flick) {
+      sheet.style.transform = "translateY(100%)";
+      setTimeout(() => { closeSheet(bgId); sheet.style.transform = ""; sheet.classList.remove("settling"); }, 260);
+    } else {
+      sheet.style.transform = "";
+      setTimeout(() => sheet.classList.remove("settling"), 320);
+    }
+  };
+  sheet.addEventListener("pointerup", end);
+  sheet.addEventListener("pointercancel", end);
+}
+for (const bg of document.querySelectorAll(".sheet-bg")) {
+  const sheet = bg.querySelector(".sheet");
+  if (sheet) makeDraggable(sheet, bg.id);
+}
 for (const b of document.querySelectorAll("[data-close]")) {
   b.addEventListener("click", () => closeSheet(b.dataset.close));
 }
 for (const bg of document.querySelectorAll(".sheet-bg")) {
-  bg.addEventListener("click", (e) => { if (e.target === bg) bg.hidden = true; });
+  bg.addEventListener("click", (e) => { if (e.target === bg) closeSheet(bg.id); });
 }
 document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape") document.querySelectorAll(".sheet-bg").forEach((s) => { s.hidden = true; });
+  if (e.key !== "Escape") return;
+  document.querySelectorAll(".sheet-bg").forEach((s) => { s.hidden = true; });
+  syncSheetState();
 });
 
 // ── Tabs ────────────────────────────────────────────────────────────────────
 
 const TABS = ["trip", "now", "rest", "doc"];
 function setTab(name) {
+  const from = TABS.indexOf(state.tab), to = TABS.indexOf(name);
   state.tab = name;
   for (const t of [...TABS, "empty"]) $(`tab-${t}`).hidden = true;
   if (!state.payload) { $("tab-empty").hidden = false; return; }
-  $(`tab-${name}`).hidden = false;
+
+  // Come in from the side the tab lives on, so the four of them feel like places.
+  const panel = $(`tab-${name}`);
+  panel.classList.remove("from-left", "from-right");
+  if (from >= 0 && to >= 0 && from !== to) panel.classList.add(to > from ? "from-right" : "from-left");
+  panel.hidden = false;
+
   for (const b of document.querySelectorAll(".tabbtn")) {
-    b.setAttribute("aria-selected", String(b.dataset.tab === name));
+    const on = b.dataset.tab === name;
+    b.setAttribute("aria-selected", String(on));
+    b.classList.remove("pop");
+    if (on && from !== to) { void b.offsetWidth; b.classList.add("pop"); }
   }
   $("scroll").scrollTop = 0;
   window.scrollTo({ top: 0, behavior: "auto" });
+  onScroll();
   if (name === "trip") drawTrace();
 }
+
+/**
+ * The nav bar earns its separator, and the trip title hands off from the hero to the bar as the
+ * hero leaves. Two elements crossfading beats one element resizing: no reflow, no jitter.
+ */
+function onScroll() {
+  const past = window.scrollY > 150 || state.tab !== "trip";
+  $("topbar").classList.toggle("scrolled", past && Boolean(state.payload));
+}
+window.addEventListener("scroll", onScroll, { passive: true });
 for (const b of document.querySelectorAll(".tabbtn")) {
   b.addEventListener("click", () => setTab(b.dataset.tab));
 }
@@ -148,7 +244,9 @@ function renderAll() {
   }
   $("tabbar").hidden = false;
   $("trip-pill").hidden = false;
-  $("trip-pill").textContent = t.pairing?.pairing_id ?? "Trip";
+  const lowPct = t.outputs?.min_effectiveness_pct ?? null;
+  $("trip-pill").innerHTML = `<b>${esc(t.pairing?.pairing_id ?? "Trip")}</b>${
+    lowPct === null ? "" : ` · <span style="color:${bandColor(lowPct)}">${esc(pct(lowPct))}</span>`}`;
   state.tmodel = traceModel(t);
   renderTrip();
   renderNow();
@@ -222,14 +320,18 @@ function drawRing(value, band) {
         stroke-linecap="round" fill="none" transform="rotate(-90 108 108)"
         stroke-dasharray="${C.toFixed(1)}" stroke-dashoffset="${(reduceMotion ? C * (1 - fill) : C).toFixed(1)}"/>
       <text class="ring-num" x="108" y="104" text-anchor="middle" fill="var(--ink)" stroke="none"
-        >${pct(value).replace("%", "")}<tspan>%</tspan></text>
+        ><tspan id="ring-val">${reduceMotion ? pct(value).replace("%", "") : "0"}</tspan><tspan>%</tspan></text>
       <text class="ring-band" x="108" y="130" text-anchor="middle" fill="${color}" stroke="none"
         >${esc(band.label)}</text>
     </svg>`;
   if (!reduceMotion) {
+    const shown = pct(value);
+    const decimals = shown.includes(".") ? 1 : 0;
     requestAnimationFrame(() => {
       const arc = $("ring-arc");
       if (arc) arc.style.strokeDashoffset = String(C * (1 - fill));
+      const val = $("ring-val");
+      if (val) countTo(val, value, { decimals, duration: 1150 });
     });
   }
 }
@@ -326,6 +428,7 @@ function renderNow() {
   const duties = m.duties;
   const first = duties[0], last = duties[duties.length - 1];
   const parts = [];
+  state.countTarget = null;
 
   const current = duties.find((d) => now >= d.report && now <= d.release);
   const next = duties.find((d) => d.report > now);
@@ -334,20 +437,20 @@ function renderNow() {
   // Phase card.
   if (now < first.report) {
     parts.push(phaseCard("Before the trip", `D${first.day} reports in`, untilText(now, first.report),
-      `${zulu(new Date(first.report).toISOString())} · ${dayText(first.date)}`, null));
+      `${zulu(new Date(first.report).toISOString())} · ${dayText(first.date)}`, null, first.report));
   } else if (current) {
     const leg = current.legs.find((l) => now >= l.dep && now <= l.arr);
     parts.push(phaseCard(`D${current.day} in progress`,
       leg ? `Airborne · ${leg.flight} ${leg.from}–${leg.to}` : "On the ground",
       untilText(now, current.release), `Release ${zulu(new Date(current.release).toISOString())}`,
-      { at: now, from: current.report, to: current.release, a: "Report", b: "Release" }));
+      { at: now, from: current.report, to: current.release, a: "Report", b: "Release" }, current.release));
   } else if (restNow && next) {
     parts.push(phaseCard(`Layover · ${restNow.station}`, `D${next.day} reports in`,
       untilText(now, next.report), `${zulu(new Date(next.report).toISOString())} · ${dayText(next.date)}`,
-      { at: now, from: restNow.winStart, to: restNow.winEnd, a: "Window opens", b: "Window closes" }));
+      { at: now, from: restNow.winStart, to: restNow.winEnd, a: "Window opens", b: "Window closes" }, next.report));
   } else if (next) {
     parts.push(phaseCard("Between duties", `D${next.day} reports in`, untilText(now, next.report),
-      `${zulu(new Date(next.report).toISOString())} · ${dayText(next.date)}`, null));
+      `${zulu(new Date(next.report).toISOString())} · ${dayText(next.date)}`, null, next.report));
   } else {
     parts.push(`<div class="phase-card">
       <div class="phase-tag">Trip complete</div>
@@ -412,12 +515,13 @@ function renderNow() {
   $("now-body").innerHTML = parts.join("");
 }
 
-function phaseCard(tag, what, count, sub, progress) {
+function phaseCard(tag, what, count, sub, progress, target = null) {
   const soon = /^(\d+)m$/.test(count) || /^[0-5]h/.test(count);
+  if (target) state.countTarget = target;
   return `<div class="phase-card">
     <div class="phase-tag">${esc(tag)}</div>
     <div class="phase-what">${esc(what)}</div>
-    <div class="count ${soon ? "soon" : ""}">${esc(count)}</div>
+    <div class="count ${soon ? "soon" : ""}" id="count-live">${esc(count)}</div>
     <div class="count-sub">${esc(sub)}</div>
     ${progress ? `
       <div class="bar"><i style="width:${(Math.max(0, Math.min(1, (progress.at - progress.from) / (progress.to - progress.from))) * 100).toFixed(1)}%"></i></div>
@@ -835,9 +939,18 @@ async function rerun() {
 
 // ── Import ──────────────────────────────────────────────────────────────────
 
+function moveSegIndicator() {
+  const on = $("import-seg").querySelector("button.on");
+  const ind = $("seg-ind");
+  if (!on || !ind) return;
+  ind.style.width = `${on.offsetWidth}px`;
+  ind.style.transform = `translateX(${on.offsetLeft}px)`;
+}
+
 function setSource(src) {
   state.source = src;
   for (const b of $("import-seg").querySelectorAll("button")) b.classList.toggle("on", b.dataset.src === src);
+  moveSegIndicator();
   $("src-sample").hidden = src !== "sample";
   $("src-shot").hidden = src !== "shot";
   $("src-text").hidden = src !== "text";
@@ -924,7 +1037,8 @@ $("import-run").addEventListener("click", async () => {
   } finally { done(); }
 });
 
-async function analyzeTranscript(text, carrier) {
+async function analyzeTranscript(text, carrier, { ocr = false } = {}) {
+  if (typeof text !== "string") throw new Error("Nothing readable came back from that screenshot.");
   working("Reading the trip");
   await engineReady;
   if (!engine) throw new Error("The analysis core did not load. Reload the app and try again.");
@@ -932,20 +1046,25 @@ async function analyzeTranscript(text, carrier) {
     carrier, actualSleep: state.sleep, revisions: revisionsPayload(),
   });
   payload.transcript = text;
+  payload.ocr = ocr;
   state.payload = payload;
   state.scope = "trip";
   persist();
   renderAll();
   setTab("trip");
+  // A transcript the device read itself deserves a look before the numbers are trusted.
+  if (ocr) $("ocr-note").hidden = false;
 }
 
 async function analyzeScreenshot(file) {
   working("Reading the screenshot on this device");
   const { transcribeOnDevice } = await import(`./ocr.js?v=${V}`);
-  const text = await transcribeOnDevice(file, (msg) => { $("working-text").textContent = msg; });
-  await analyzeTranscript(text, state.carrier);
-  state.payload.ocr = true;
-  persist();
+  // transcribeOnDevice resolves to { text, confidence } — taking the object whole was a real bug.
+  const { text } = await transcribeOnDevice(file, (message, progress) => {
+    $("working-text").textContent = progress
+      ? `${message} ${Math.round(progress * 100)}%` : message;
+  });
+  await analyzeTranscript(text, state.carrier, { ocr: true });
 }
 
 // ── Samples and carriers ────────────────────────────────────────────────────
@@ -1033,7 +1152,9 @@ function restore() {
 
 $("open-menu").addEventListener("click", () => openSheet("menu-sheet"));
 $("trip-pill").addEventListener("click", () => openSheet("menu-sheet"));
-$("menu-new").addEventListener("click", () => { closeSheet("menu-sheet"); setSource("sample"); openSheet("import-sheet"); });
+$("menu-new").addEventListener("click", () => { closeSheet("menu-sheet"); setSource("sample"); openSheet("import-sheet"); requestAnimationFrame(moveSegIndicator); });
+$("ocr-open").addEventListener("click", () => { $("menu-transcript").click(); });
+$("ocr-dismiss").addEventListener("click", () => { $("ocr-note").hidden = true; });
 $("menu-transcript").addEventListener("click", () => {
   closeSheet("menu-sheet");
   $("transcript-text").value = state.payload?.transcript ?? "";
@@ -1056,8 +1177,8 @@ $("menu-clear").addEventListener("click", () => {
   closeSheet("menu-sheet");
   renderAll();
 });
-$("empty-add").addEventListener("click", () => { setSource("shot"); openSheet("import-sheet"); });
-$("empty-sample").addEventListener("click", () => { setSource("sample"); openSheet("import-sheet"); });
+$("empty-add").addEventListener("click", () => { setSource("shot"); openSheet("import-sheet"); requestAnimationFrame(moveSegIndicator); });
+$("empty-sample").addEventListener("click", () => { setSource("sample"); openSheet("import-sheet"); requestAnimationFrame(moveSegIndicator); });
 $("trace-legend-btn").addEventListener("click", () => {
   $("legend-body").innerHTML = `
     <div class="legend-row"><span class="legend-key" style="background:var(--band-green)"></span>
@@ -1108,8 +1229,21 @@ if ("serviceWorker" in navigator) {
   await engineReady;
   renderCarriers();
   setSource("sample");
+  requestAnimationFrame(moveSegIndicator);
   if (restore()) renderAll();
   else { $("tabbar").hidden = true; setTab("trip"); }
-  // A countdown that never moves is worse than no countdown.
-  setInterval(() => { if (state.payload && state.tab === "now") renderNow(); }, 30000);
+  // A countdown that never moves is worse than no countdown. Only the digits are touched, so the
+  // card's entrance animation is not restarted once a second.
+  let lastCount = "";
+  setInterval(() => {
+    if (!state.payload || state.tab !== "now" || !state.countTarget) return;
+    const node = $("count-live");
+    if (!node) return;
+    const next = untilText(Date.now(), state.countTarget);
+    if (next === lastCount) return;
+    lastCount = next;
+    node.textContent = next;
+    if (!reduceMotion) { node.classList.remove("tick"); void node.offsetWidth; node.classList.add("tick"); }
+  }, 1000);
+  setInterval(() => { if (state.payload && state.tab === "now") renderNow(); }, 120000);
 })();

@@ -207,31 +207,32 @@ export function renderTrace(container, model, { scope = "trip", now = Date.now()
   }
 
   // Duty periods, with a tick at every leg boundary and the flown/deadhead split visible.
-  for (const d of model.duties) {
-    if (!d.report || !d.release || d.release < win.from || d.report > win.to) continue;
+  model.duties.forEach((d, i) => {
+    if (!d.report || !d.release || d.release < win.from || d.report > win.to) return;
     const x0 = clampX(d.report), x1 = clampX(d.release);
-    out.push(`<rect class="duty-bar" x="${x0.toFixed(1)}" y="${DUTY_Y}" width="${Math.max(2, x1 - x0).toFixed(1)}" height="${DUTY_H}" rx="5"/>`);
+    out.push(`<rect class="duty-bar" style="animation-delay:${(140 + i * 70)}ms" x="${x0.toFixed(1)}" y="${DUTY_Y}" width="${Math.max(2, x1 - x0).toFixed(1)}" height="${DUTY_H}" rx="5"/>`);
     for (const l of d.legs) {
-      if (!l.dep || !inWin(l.dep)) continue;
+      if (!l.dep || !inWin(l.dep)) continue;  // eslint-disable-line no-continue
       out.push(`<line class="leg-tick" x1="${x(l.dep).toFixed(1)}" x2="${x(l.dep).toFixed(1)}" y1="${DUTY_Y}" y2="${DUTY_Y + DUTY_H}"/>`);
     }
     if (x1 - x0 > 26) {
       out.push(`<text class="duty-label" x="${(x0 + 6).toFixed(1)}" y="${DUTY_Y + 14}">D${d.day}</text>`);
     }
-  }
+  });
 
   // Modeled sleep: the opportunity window dim, each modeled block bright inside it.
-  for (const r of model.sleeps) {
-    if (r.winEnd < win.from || r.winStart > win.to) continue;
+  model.sleeps.forEach((r, i) => {
+    if (r.winEnd < win.from || r.winStart > win.to) return;
+    const delay = 180 + i * 70;
     const x0 = clampX(r.winStart), x1 = clampX(r.winEnd);
-    out.push(`<rect class="sleep-bar" x="${x0.toFixed(1)}" y="${SLEEP_Y}" width="${Math.max(2, x1 - x0).toFixed(1)}" height="${SLEEP_H}" rx="5"/>`);
+    out.push(`<rect class="sleep-bar" style="animation-delay:${delay}ms" x="${x0.toFixed(1)}" y="${SLEEP_Y}" width="${Math.max(2, x1 - x0).toFixed(1)}" height="${SLEEP_H}" rx="5"/>`);
     for (const b of r.blocks) {
       if (!b.start || !b.end) continue;
       const b0 = clampX(b.start), b1 = clampX(b.end);
       if (b1 - b0 < 0.5) continue;
-      out.push(`<rect class="sleep-eff" x="${b0.toFixed(1)}" y="${SLEEP_Y + 3}" width="${(b1 - b0).toFixed(1)}" height="${SLEEP_H - 6}" rx="3"/>`);
+      out.push(`<rect class="sleep-eff" style="animation-delay:${delay + 90}ms" x="${b0.toFixed(1)}" y="${SLEEP_Y + 3}" width="${(b1 - b0).toFixed(1)}" height="${SLEEP_H - 6}" rx="3"/>`);
     }
-  }
+  });
   out.push(`<text class="rowlabel" x="${PAD_L - 6}" y="${DUTY_Y + 14}" text-anchor="end">DUTY</text>`);
   out.push(`<text class="rowlabel" x="${PAD_L - 6}" y="${SLEEP_Y + 13}" text-anchor="end">REST</text>`);
 
@@ -270,6 +271,16 @@ export function renderTrace(container, model, { scope = "trip", now = Date.now()
   container.innerHTML =
     `<svg class="trace" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img"
        aria-label="Estimated effectiveness across the trip, with duty periods, modeled sleep and the window of circadian low.">${out.join("")}</svg>`;
+
+  // Draw the line on from the start of the trip, the way a Health chart does. The dash length has
+  // to come from the laid-out path, so this happens after the SVG is in the document.
+  const path = container.querySelector(".curve");
+  if (path && !matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    const len = path.getTotalLength();
+    path.style.strokeDasharray = `${len}`;
+    path.style.strokeDashoffset = `${len}`;
+    requestAnimationFrame(() => { path.style.strokeDashoffset = "0"; });
+  }
 }
 
 /** The same shape, 52px wide, for a list row. */

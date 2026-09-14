@@ -36,6 +36,17 @@
   --duty:      #46557A;
   --wocl:      rgba(138, 116, 255, 0.10);
 
+  /* Motion. Springs overshoot slightly and settle; nothing here is linear, because nothing
+   * physical is. Durations are short enough that the UI never feels like it is waiting on itself. */
+  --ease-out:    cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-spring: cubic-bezier(0.34, 1.42, 0.64, 1);
+  --ease-soft:   cubic-bezier(0.4, 0, 0.2, 1);
+  --dur-fast:    160ms;
+  --dur:         320ms;
+  --dur-slow:    560ms;
+
+  --behind:    #04060B;
+
   --radius:    16px;
   --radius-sm: 11px;
   --shadow:    0 10px 30px rgba(0, 0, 0, 0.45);
@@ -72,6 +83,7 @@
   --duty:      #AEB8CC;
   --wocl:      rgba(100, 80, 220, 0.08);
   --shadow:    0 8px 24px rgba(20, 30, 60, 0.10);
+  --behind:    #C9CFDC;
   color-scheme: light;
 }
 
@@ -104,15 +116,30 @@ svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round
 
 /* ── Frame ─────────────────────────────────────────────────────────────── */
 
-.app { display: flex; flex-direction: column; min-height: 100svh; }
+body { transition: background-color var(--dur) var(--ease-soft); }
+body.sheet-open { background: var(--behind); }
+
+.app {
+  display: flex; flex-direction: column; min-height: 100svh;
+  transform-origin: 50% 0; background: var(--bg);
+  transition: transform var(--dur-slow) var(--ease-out), border-radius var(--dur-slow) var(--ease-out);
+}
+body.sheet-open .app {
+  transform: scale(0.955) translateY(8px); border-radius: 20px; overflow: hidden;
+}
 
 .topbar {
   position: sticky; top: 0; z-index: 40;
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
   padding: calc(var(--top) + 10px) var(--gut) 10px;
-  background: color-mix(in srgb, var(--bg) 88%, transparent);
-  backdrop-filter: saturate(160%) blur(14px);
-  border-bottom: 1px solid var(--hair-soft);
+  background: color-mix(in srgb, var(--bg) 82%, transparent);
+  backdrop-filter: saturate(180%) blur(20px);
+  border-bottom: 1px solid transparent;
+  transition: border-color var(--dur) var(--ease-soft), background-color var(--dur) var(--ease-soft);
+}
+.topbar.scrolled {
+  border-bottom-color: var(--hair-soft);
+  background: color-mix(in srgb, var(--bg) 92%, transparent);
 }
 .wordmark { font-weight: 800; letter-spacing: 0.1em; font-size: 14px; }
 .wordmark .a { color: var(--ink); }
@@ -126,11 +153,17 @@ svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round
 .icon-btn svg { width: 17px; height: 17px; }
 .icon-btn:active { background: var(--raised); }
 
+/* The trip title lives in the hero until you scroll past it, then it comes up to the nav bar —
+ * the iOS large-title handoff, done with two elements instead of one that resizes. */
 .pill {
   border: 1px solid var(--hair); background: var(--surface); color: var(--sub);
   border-radius: 999px; padding: 6px 12px; font-size: 12.5px; font-weight: 650;
   letter-spacing: 0.04em; cursor: pointer;
+  opacity: 0; transform: translateY(-8px) scale(0.86); pointer-events: none;
+  transition: opacity var(--dur) var(--ease-out), transform var(--dur) var(--ease-spring);
 }
+.topbar.scrolled .pill { opacity: 1; transform: none; pointer-events: auto; }
+.pill b { color: var(--ink); font-weight: 700; }
 
 .scroll { flex: 1; padding: 0 var(--gut) 120px; max-width: 760px; width: 100%; margin: 0 auto; }
 
@@ -148,14 +181,55 @@ svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round
   font-size: 10.5px; font-weight: 600; letter-spacing: 0.03em;
   border-radius: 12px; transition: color 0.16s;
 }
-.tabbtn svg { width: 22px; height: 22px; }
+.tabbtn svg {
+  width: 22px; height: 22px;
+  transition: transform var(--dur) var(--ease-spring), color var(--dur-fast) var(--ease-soft);
+}
 .tabbtn[aria-selected="true"] { color: var(--ink); }
-.tabbtn[aria-selected="true"] svg { color: var(--brand); }
+.tabbtn[aria-selected="true"] svg { color: var(--brand); transform: scale(1.14) translateY(-1px); }
+.tabbtn:active svg { transform: scale(0.9); }
+@keyframes tabPop {
+  0%   { transform: scale(0.9); }
+  45%  { transform: scale(1.3) translateY(-2px); }
+  100% { transform: scale(1.14) translateY(-1px); }
+}
+.tabbtn.pop svg { animation: tabPop 440ms var(--ease-spring); }
 .tabbtn:disabled { opacity: 0.35; cursor: default; }
 
-.tab { animation: rise 0.28s cubic-bezier(.22,1,.36,1) both; }
-@keyframes rise { from { opacity: 0; transform: translateY(8px); } }
-@media (prefers-reduced-motion: reduce) { .tab { animation: none; } }
+/* Tabs slide in from the side they live on, so the four of them feel like places rather than
+ * states. Direction is set by ui.js from the index the pilot came from. */
+.tab { animation: tabIn var(--dur) var(--ease-out) both; }
+.tab.from-right { animation-name: tabInRight; }
+.tab.from-left  { animation-name: tabInLeft; }
+@keyframes tabIn      { from { opacity: 0; transform: translateY(8px); } }
+@keyframes tabInRight { from { opacity: 0; transform: translateX(26px); } }
+@keyframes tabInLeft  { from { opacity: 0; transform: translateX(-26px); } }
+
+/* Content arrives in sequence rather than all at once: the eye gets a reading order for free. */
+@keyframes cardIn { from { opacity: 0; transform: translateY(16px); } }
+.stagger > * { animation: cardIn 440ms var(--ease-out) both; }
+.stagger > *:nth-child(1) { animation-delay: 30ms; }
+.stagger > *:nth-child(2) { animation-delay: 75ms; }
+.stagger > *:nth-child(3) { animation-delay: 120ms; }
+.stagger > *:nth-child(4) { animation-delay: 165ms; }
+.stagger > *:nth-child(5) { animation-delay: 210ms; }
+.stagger > *:nth-child(6) { animation-delay: 250ms; }
+.stagger > *:nth-child(n+7) { animation-delay: 290ms; }
+
+/* Press feedback: everything tappable gives a little under the finger. */
+.btn, .duty-row, .sample-row, .chip, .scope, .menu-row, .icon-btn, .rest-card {
+  transition: transform var(--dur-fast) var(--ease-out),
+              background-color var(--dur-fast) var(--ease-soft),
+              border-color var(--dur-fast) var(--ease-soft),
+              color var(--dur-fast) var(--ease-soft);
+}
+.duty-row:active, .sample-row:active, .menu-row:active { transform: scale(0.982); }
+.chip:active, .scope:active, .icon-btn:active { transform: scale(0.92); }
+
+@media (prefers-reduced-motion: reduce) {
+  .tab, .stagger > * { animation: none !important; }
+  * { transition-duration: 1ms !important; }
+}
 
 .block { margin-top: 26px; }
 .block-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
@@ -181,7 +255,7 @@ svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round
   font-weight: 650; font-size: 15px; cursor: pointer; background: var(--surface-2); color: var(--ink);
   transition: transform 0.08s, filter 0.16s;
 }
-.btn:active { transform: scale(0.985); }
+.btn:active { transform: scale(0.972); }
 .btn:disabled { opacity: 0.4; cursor: default; transform: none; }
 .btn-primary { background: var(--brand); color: #fff; border-color: transparent; }
 [data-theme="light"] .btn-primary { color: #fff; }
@@ -199,14 +273,33 @@ svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round
 .chip .soon { font-size: 9.5px; letter-spacing: 0.08em; margin-left: 6px; color: var(--dim); }
 
 .seg {
+  position: relative;
   display: grid; grid-auto-flow: column; gap: 4px; padding: 4px;
   background: var(--surface-2); border-radius: 12px; margin-bottom: 14px;
 }
+.seg-ind {
+  position: absolute; top: 4px; bottom: 4px; left: 0; border-radius: 9px;
+  background: var(--raised); z-index: 0;
+  transition: transform var(--dur) var(--ease-spring), width var(--dur) var(--ease-spring);
+}
 .seg button {
+  position: relative; z-index: 1;
   border: 0; background: none; border-radius: 9px; padding: 9px 6px;
   font-size: 13.5px; font-weight: 600; color: var(--sub); cursor: pointer;
+  transition: color var(--dur-fast) var(--ease-soft);
 }
-.seg button.on { background: var(--raised); color: var(--ink); }
+.seg button.on { color: var(--ink); }
+
+/* A transcript the device read itself is the one input worth doubting, so it says so. */
+.ocr-note {
+  margin-top: 16px; padding: 14px 16px; border-radius: var(--radius);
+  background: color-mix(in srgb, var(--band-yellow) 13%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--band-yellow) 30%, transparent);
+  font-size: 13.5px;
+}
+.ocr-note b { color: var(--band-yellow); }
+.ocr-actions { display: flex; gap: 8px; margin-top: 12px; }
+.ocr-actions .btn { flex: 1; padding: 9px 12px; font-size: 14px; }
 
 /* ── Hero ──────────────────────────────────────────────────────────────── */
 
@@ -214,7 +307,16 @@ svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round
 .hero-ring { display: grid; place-items: center; }
 .hero-ring svg { width: 216px; height: 216px; overflow: visible; }
 .ring-track { stroke: var(--hair); }
-.ring-arc { transition: stroke-dashoffset 1.1s cubic-bezier(.22,1,.36,1); }
+.ring-arc {
+  transition: stroke-dashoffset 1.25s var(--ease-out);
+  filter: drop-shadow(0 0 9px color-mix(in srgb, currentColor 38%, transparent));
+}
+.hero-ring svg { animation: ringIn 620ms var(--ease-spring) both; }
+@keyframes ringIn { from { opacity: 0; transform: scale(0.88); } }
+.hero-label, .hero-where, .hero-bac { animation: cardIn 460ms var(--ease-out) both; }
+.hero-label { animation-delay: 300ms; }
+.hero-where { animation-delay: 360ms; }
+.hero-bac   { animation-delay: 420ms; }
 @media (prefers-reduced-motion: reduce) { .ring-arc { transition: none; } }
 .ring-num { font-size: 52px; font-weight: 700; letter-spacing: -0.03em; }
 .ring-num tspan { font-size: 22px; font-weight: 600; }
@@ -263,8 +365,27 @@ svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round
 .trace .sleep-bar { fill: var(--sleep-dim); }
 .trace .sleep-eff { fill: var(--sleep); }
 .trace .rowlabel { fill: var(--dim); font-size: 8.5px; letter-spacing: 0.1em; }
-.trace .curve { stroke-width: 2.4; }
-.trace .curve-fill { stroke: none; opacity: 0.16; }
+.trace .curve {
+  stroke-width: 2.4;
+  transition: stroke-dashoffset 1100ms var(--ease-soft);
+}
+@keyframes fadeIn { from { opacity: 0; } }
+@keyframes barIn  { from { opacity: 0; transform: scaleY(0.15); } }
+@keyframes popIn  { from { opacity: 0; transform: scale(0.4); } }
+.trace .duty-bar, .trace .sleep-bar, .trace .sleep-eff {
+  animation: barIn 460ms var(--ease-spring) both;
+  transform-box: fill-box; transform-origin: 50% 100%;
+}
+.trace .wocl-band, .trace .wocl-label { animation: fadeIn 700ms var(--ease-soft) both; }
+.trace .minpt, .trace .minlabel {
+  animation: popIn 460ms var(--ease-spring) 900ms both;
+  transform-box: fill-box; transform-origin: 50% 50%;
+}
+.trace .nowline, .trace .nowlabel { animation: fadeIn 500ms var(--ease-soft) 700ms both; }
+.trace .curve-fill {
+  stroke: none; opacity: 0.16;
+  animation: fadeIn 800ms var(--ease-soft) 420ms both;
+}
 .trace .minpt { stroke: var(--bg); stroke-width: 2.5; }
 .trace .minlabel { fill: var(--ink); font-size: 10.5px; font-weight: 700;
   paint-order: stroke; stroke: var(--surface); stroke-width: 3px; }
@@ -307,11 +428,20 @@ svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round
 .phase-card { background: var(--surface); border: 1px solid var(--hair-soft); border-radius: var(--radius); padding: 20px 18px; }
 .phase-tag { font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--dim); }
 .phase-what { font-size: 17px; font-weight: 650; margin-top: 6px; }
-.count { font-size: 44px; font-weight: 700; letter-spacing: -0.035em; margin: 14px 0 2px; }
+.count {
+  font-size: 44px; font-weight: 700; letter-spacing: -0.035em; margin: 14px 0 2px;
+  font-variant-numeric: tabular-nums;
+}
+.count.tick { animation: tick 420ms var(--ease-out); }
+@keyframes tick { 0% { opacity: 0.45; transform: translateY(-3px); } }
 .count.soon { color: var(--band-orange); }
 .count-sub { font-size: 13px; color: var(--sub); }
 .bar { height: 7px; border-radius: 99px; background: var(--raised); overflow: hidden; margin-top: 16px; }
-.bar i { display: block; height: 100%; border-radius: 99px; background: var(--sleep); }
+.bar i {
+  display: block; height: 100%; border-radius: 99px; background: var(--sleep);
+  transform-origin: 0 50%; animation: fill 900ms var(--ease-out) 260ms both;
+}
+@keyframes fill { from { transform: scaleX(0); } }
 .bar-note { display: flex; justify-content: space-between; font-size: 11px; color: var(--dim); margin-top: 6px; }
 
 .nowpct { display: flex; align-items: center; gap: 14px; }
@@ -383,10 +513,20 @@ textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
   width: 100%; max-width: 560px; max-height: 92svh; display: flex; flex-direction: column;
   background: var(--bg); border: 1px solid var(--hair); border-bottom: 0;
   border-radius: 22px 22px 0 0; box-shadow: var(--shadow);
-  animation: slideup 0.3s cubic-bezier(.22,1,.36,1) both;
+  animation: slideup 440ms var(--ease-out) both;
+  touch-action: pan-y;
 }
 .sheet-wide { max-width: 720px; }
-@keyframes slideup { from { transform: translateY(26px); } }
+@keyframes slideup { from { transform: translateY(100%); } }
+
+/* The grabber is the affordance for the drag; ui.js does the dragging. */
+.grabber {
+  flex: 0 0 auto; width: 38px; height: 5px; border-radius: 99px;
+  background: var(--hair); margin: 9px auto 0; cursor: grab;
+}
+.sheet.dragging { animation: none; transition: none; }
+.sheet.settling { animation: none; transition: transform var(--dur) var(--ease-out); }
+
 @media (prefers-reduced-motion: reduce) { .sheet-bg, .sheet { animation: none; } }
 .sheet-head {
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
