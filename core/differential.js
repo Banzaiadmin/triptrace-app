@@ -6,15 +6,15 @@
  * reference: a difference means the port is wrong, never the golden.
  */
 
-import { parseTripBoard } from "./parser.js?v=23";
-import { scoreTrace } from "./scorer.js?v=23";
-import { buildReport } from "./report.js?v=23";
-import { applyRevisions, workloadPoints } from "./revisions.js?v=23";
-import { pyRound, pyFmt, pyRepr, pyFloatStr } from "./py.js?v=23";
-import { fmtLocal, fmtUtc, localToUtc, parseUtc, utcOffsetMinutes, localParts } from "./tz.js?v=23";
+import { parseTripBoard } from "./parser.js?v=24";
+import { scoreTrace } from "./scorer.js?v=24";
+import { buildReport } from "./report.js?v=24";
+import { applyRevisions, workloadPoints } from "./revisions.js?v=24";
+import { pyRound, pyFmt, pyRepr, pyFloatStr } from "./py.js?v=24";
+import { fmtLocal, fmtUtc, localToUtc, parseUtc, utcOffsetMinutes, localParts } from "./tz.js?v=24";
 import {
   WearableError, coverageSummary, detectAndNormalize, importSleep, matchToRestPeriods, toActualSleep,
-} from "./wearables.js?v=23";
+} from "./wearables.js?v=24";
 
 /**
  * Floats round-trip through two languages' math libraries; the last bit can differ. Anything the

@@ -12,9 +12,9 @@
  * first real one as a test case.
  */
 
-import { MODEL_PARAMS } from "./constants.js?v=23";
-import { pyRepr, pyRound, pyStr } from "./py.js?v=23";
-import { fmtUtc } from "./tz.js?v=23";
+import { MODEL_PARAMS } from "./constants.js?v=24";
+import { pyRepr, pyRound, pyStr } from "./py.js?v=24";
+import { fmtUtc } from "./tz.js?v=24";
 
 const HOUR = 3_600_000;
 const MINUTE = 60_000;
