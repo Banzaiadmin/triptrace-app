@@ -10,7 +10,7 @@
 // Bump ASSET_VERSION (and the ?v= query in index.html) on every deploy that changes app.js or
 // styles.css. Without it a browser can serve a cached shell against new HTML — which on this app
 // would mean a pilot running an old model against a new interface.
-const ASSET_VERSION = "14";
+const ASSET_VERSION = "15";
 const CACHE = `triptrace-shell-v${ASSET_VERSION}`;
 const SHELL = [
   "./",

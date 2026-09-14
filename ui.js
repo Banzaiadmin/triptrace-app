@@ -12,9 +12,9 @@
  * Where the pilot is right now is shown by position on the chart, not by a made-up percentage.
  */
 
-import { traceModel, renderTrace, sparkline, bandFor, bandColor, bandVar } from "./trace.js?v=14";
+import { traceModel, renderTrace, sparkline, bandFor, bandColor, bandVar } from "./trace.js?v=15";
 
-const V = "14";
+const V = "15";
 const $ = (id) => document.getElementById(id);
 const LAST_KEY = "triptrace.last";
 const REVISIONS_KEY = "triptrace.revisions";
@@ -174,7 +174,7 @@ function renderTrip() {
     const b = bandFor(d.minPct ?? 100);
     const logged = state.revisions[d.day];
     const tag = logged && (logged.delay_minutes || logged.factors?.size)
-      ? `<span class="flag floor">logged</span>` : "";
+      ? `<span class="flag floor">Logged</span> ` : "";
     return `<button class="duty-row" data-day="${d.day}">
       <div>
         <div class="duty-day">D${d.day}</div>
@@ -276,7 +276,11 @@ function openDuty(day) {
         <div class="kv"><span>Release</span><span>${esc(localHM(raw.release) ?? "—")}L · ${esc(zulu(raw.release?.utc))}</span></div>
         <div class="kv"><span>Duty</span><span>${esc(hm(raw.scheduled_duty?.actual_hours ?? raw.scheduled_duty?.scheduled_hours))}${raw.scheduled_duty?.actual_hours ? " (actual)" : ""}</span></div>
         <div class="kv"><span>Landings</span><span>${raw.landings ?? 0}</span></div>
-        <div class="kv"><span>At report → low → release</span><span>${pct(d.startPct)} → ${pct(d.minPct)} → ${pct(d.endPct)}</span></div>
+      </div>
+      <div class="rest-nums" style="margin-top:14px">
+        <div><div class="v">${pct(d.startPct)}</div><div class="l">At report</div></div>
+        <div><div class="v" style="color:${bandVar(b.key)}">${pct(d.minPct)}</div><div class="l">Lowest</div></div>
+        <div><div class="v">${pct(d.endPct)}</div><div class="l">At release</div></div>
       </div>
     </div>
 
