@@ -319,7 +319,7 @@ body.sheet-open .app {
 .hero-bac   { animation-delay: 420ms; }
 @media (prefers-reduced-motion: reduce) { .ring-arc { transition: none; } }
 .ring-num { font-size: 52px; font-weight: 700; letter-spacing: -0.03em; }
-.ring-num tspan { font-size: 22px; font-weight: 600; }
+.ring-num tspan.unit { font-size: 22px; font-weight: 600; }
 .ring-band { font-size: 13px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; }
 .hero-label { margin-top: 2px; font-size: 11.5px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--dim); }
 .hero-where { margin-top: 8px; font-size: 16px; font-weight: 600; }
