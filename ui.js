@@ -12,9 +12,9 @@
  * Where the pilot is right now is shown by position on the chart, not by a made-up percentage.
  */
 
-import { traceModel, renderTrace, sparkline, bandFor, bandColor, bandVar } from "./trace.js?v=19";
+import { traceModel, renderTrace, sparkline, bandFor, bandColor, bandVar } from "./trace.js?v=20";
 
-const V = "19";
+const V = "20";
 const $ = (id) => document.getElementById(id);
 const LAST_KEY = "triptrace.last";
 const REVISIONS_KEY = "triptrace.revisions";
@@ -116,9 +116,20 @@ $("menu-theme").addEventListener("click", () =>
 
 // ── Sheets ──────────────────────────────────────────────────────────────────
 
+let lockedScroll = 0;
 function syncSheetState() {
   const open = [...document.querySelectorAll(".sheet-bg")].some((s) => !s.hidden);
-  document.body.classList.toggle("sheet-open", open);
+  const was = document.body.classList.contains("sheet-open");
+  if (open === was) return;
+  if (open) {
+    lockedScroll = window.scrollY;
+    document.body.classList.add("sheet-open");
+    document.body.style.top = `-${lockedScroll}px`;
+  } else {
+    document.body.classList.remove("sheet-open");
+    document.body.style.top = "";
+    window.scrollTo(0, lockedScroll);
+  }
 }
 const openSheet = (id) => {
   const sheet = $(id).querySelector(".sheet");

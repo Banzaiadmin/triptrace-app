@@ -117,7 +117,12 @@ svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round
 /* ── Frame ─────────────────────────────────────────────────────────────── */
 
 body { transition: background-color var(--dur) var(--ease-soft); }
-body.sheet-open { background: var(--behind); }
+/* Locking the page behind a sheet keeps the background from scrolling under your thumb. The top
+ * offset preserves the scroll position, which `overflow:hidden` alone would throw away. */
+body.sheet-open {
+  background: var(--behind);
+  position: fixed; left: 0; right: 0; width: 100%;
+}
 
 .app {
   display: flex; flex-direction: column; min-height: 100svh;
@@ -505,7 +510,7 @@ textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 
 .sheet-bg {
   position: fixed; inset: 0; z-index: 90; display: flex; align-items: flex-end; justify-content: center;
-  background: rgba(3, 6, 12, 0.6); backdrop-filter: blur(3px);
+  background: rgba(3, 6, 12, 0.42); backdrop-filter: blur(5px);
   animation: fade 0.2s ease both;
 }
 @keyframes fade { from { opacity: 0; } }
