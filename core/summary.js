@@ -1,5 +1,5 @@
 /**
- * summary.js — the content of a Trip Fatigue Summary, as data.
+ * summary.js — the content of a Trip Safety Summary, as data.
  *
  * One model, two renderers: the printable page in the app and the PDF writer both draw from what
  * this returns, so the document a pilot hands to a chief pilot and the page they read on the phone
@@ -344,12 +344,12 @@ export function summaryModel(payload, context = {}) {
   const firstDate = duties[0]?.date_local;
   const lastDate = duties[duties.length - 1]?.date_local;
   return {
-    title: `Trip ${pairing.pairing_id ?? ""} — Fatigue Summary${delayed.length ? " (updated)" : ""}`.trim(),
+    title: `Trip ${pairing.pairing_id ?? ""} — Safety Summary${delayed.length ? " (updated)" : ""}`.trim(),
     subtitle: [meta.operator, meta.domicile && `${meta.domicile} ${meta.fleet ?? ""}`.trim(),
       firstDate && lastDate ? `${dateText(firstDate)} – ${dateText(lastDate)}` : null,
       `${pairing.duty_days ?? duties.length} duty periods`, `TAFB ${hmFromHours(pairing.tafb_hours ?? null)}`]
       .filter(Boolean).join(" · "),
-    prepared: `Prepared ${stampText(now)} by TripTrace · SAFTE-style approximation, not validated software`,
+    prepared: `Prepared ${stampText(now)} by TripTrace · Decision support, not validated software`,
     revised: rescheduled.length ? rescheduled.join("; ") : "",
     factors,
     logged,
@@ -368,11 +368,11 @@ export function summaryModel(payload, context = {}) {
     gaps,
     assessment,
     statement,
-    reminder: (outputs.transparency ?? {}).reminder ?? "",
-    modelAssumptions: (outputs.transparency ?? {}).sleep_assumptions ?? "",
-    circadian: (outputs.transparency ?? {}).circadian_anchors ?? "",
-    uncertainty: "Effectiveness figures are estimates from a SAFTE-style approximation; treat them as ± a few points, and treat your own symptoms as the deciding evidence.",
-    engine: payload.engine === "device" ? "Analyzed on this device" : "Analyzed by the TripTrace service",
+    // No model-notes block. The owner asked (2026-09-14) that the summary not disclose the model
+    // at the bottom, and that the Statement stay. The document keeps every caveat that protects
+    // the pilot — "not validated software" rides in `prepared`, the gaps section still says what
+    // the analysis cannot see, and the Statement is untouched — it just no longer prints the
+    // sleep-efficiency constants, the circadian drift, or which engine ran it. Do not re-add.
   };
 }
 
@@ -442,6 +442,5 @@ export function summaryText(model) {
   for (const g of model.gaps) lines.push(`  [${g.label}] ${g.detail}${g.wouldChange ? ` Would change: ${g.wouldChange}` : ""}`);
   if (model.assessment) lines.push("", "ASSESSMENT", model.assessment);
   if (model.statement) lines.push("", "STATEMENT", model.statement);
-  lines.push("", "MODEL NOTES", model.modelAssumptions, model.circadian, "", model.uncertainty, model.reminder, model.engine);
   return lines.join("\n");
 }

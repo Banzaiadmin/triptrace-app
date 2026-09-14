@@ -1,5 +1,5 @@
 /*
- * pdf.js — a small PDF writer, and the Fatigue Summary laid out with it.
+ * pdf.js — a small PDF writer, and the Safety Summary laid out with it.
  *
  * Dependency-free on purpose: the app ships as plain files with no build step and must work
  * offline, and a pilot's summary should not depend on a CDN being reachable at 3 a.m. in a hotel.
@@ -190,7 +190,7 @@ export class PdfDocument {
     const realPagesId = add(`<< /Type /Pages /Kids [${pageIds.map((id) => `${id} 0 R`).join(" ")}] /Count ${pageIds.length} >>`);
     if (realPagesId !== pagesId) throw new Error("pdf: object numbering drifted");
     const catalogId = add(`<< /Type /Catalog /Pages ${pagesId} 0 R >>`);
-    const infoId = add(`<< /Producer (TripTrace) /Title (Fatigue Summary) >>`);
+    const infoId = add(`<< /Producer (TripTrace) /Title (Safety Summary) >>`);
 
     let out = "%PDF-1.4\n%âãÏÓ\n";
     const offsets = [];
@@ -228,7 +228,7 @@ export function summaryPdf(model) {
   const doc = new PdfDocument({
     margin: 48,
     footer: (d, page) => {
-      d.text("TripTrace · SAFTE-style decision support — not validated biomathematical software, and not legal or contractual advice.",
+      d.text("TripTrace · Decision support — not validated software, and not legal or contractual advice.",
         d.margin, d.margin - 6, { size: 7.5, color: SUB });
       d.text(`Page ${page}`, d.width - d.margin - 34, d.margin - 6, { size: 7.5, color: SUB });
     },
@@ -241,7 +241,7 @@ export function summaryPdf(model) {
   doc.rect(0, doc.height - 74, doc.width, 74, NAVY);
   doc.text("TRIP", m, doc.height - 26, { size: 10, bold: true, color: "#FFFFFF" });
   doc.text("TRACE", m + textWidth("TRIP", 10, true), doc.height - 26, { size: 10, bold: true, color: "#F2B8BD" });
-  const eyebrow = `FATIGUE RISK SUMMARY${h && h.updated ? " — UPDATED" : ""}`;
+  const eyebrow = `SAFETY RISK SUMMARY${h && h.updated ? " — UPDATED" : ""}`;
   doc.text(eyebrow, right - textWidth(eyebrow, 9, true), doc.height - 26, { size: 9, bold: true, color: "#C9D1E3" });
   doc.text(model.title, m, doc.height - 48, { size: 18, bold: true, color: "#FFFFFF" });
   doc.text(model.subtitle, m, doc.height - 63, { size: 9, color: "#C9D1E3" });
@@ -273,7 +273,7 @@ export function summaryPdf(model) {
 
   // Current assessment
   if (h) {
-    doc.panel(`${h.updated ? "UPDATED CURRENT" : "CURRENT"} FATIGUE ASSESSMENT`, [
+    doc.panel(`${h.updated ? "UPDATED CURRENT" : "CURRENT"} SAFETY ASSESSMENT`, [
       { text: `Trip minimum effectiveness: ${Math.round(h.minPct)}% — ${h.bandLabel}`, size: 15, bold: true, color: BAND_COLORS[h.band] ?? INK, after: 4 },
       { text: `At ${h.where}${h.at ? ` (${h.at})` : ""}. ${cap(h.bac)}. ${h.fatigueCallIndicated ? "A fatigue call is professionally defensible at this level." : "Above the fatigue-call threshold."}`, size: 9.5 },
     ], { fill: BAND_FILL[h.band] ?? CARD, accent: BAND_COLORS[h.band] ?? NAVY, titleColor: INK });
@@ -440,13 +440,6 @@ export function summaryPdf(model) {
     doc.heading("Statement");
     doc.paragraph(model.statement, { size: 9.5 });
   }
-
-  doc.heading("Model notes");
-  doc.paragraph(model.modelAssumptions, { size: 8.5, color: SUB });
-  doc.paragraph(model.circadian, { size: 8.5, color: SUB });
-  doc.paragraph(model.uncertainty, { size: 8.5, color: SUB });
-  doc.paragraph(model.reminder, { size: 8.5, color: SUB });
-  doc.paragraph(model.engine, { size: 8.5, color: SUB });
 
   return doc.build();
 }

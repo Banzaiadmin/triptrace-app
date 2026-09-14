@@ -16,7 +16,7 @@ const $ = (id) => document.getElementById(id);
 const LAST_KEY = "triptrace.last";
 const INSTALL_DISMISSED_KEY = "triptrace.install-dismissed";
 // Bump together with ASSET_VERSION in sw.js and the ?v= in index.html.
-const V = "10";
+const V = "11";
 
 // The on-device engine, loaded lazily so a browser that cannot run it still has the service path.
 let engine = null;
@@ -50,6 +50,10 @@ const VENDOR_LABELS = { whoop: "Whoop", oura: "Oura", apple_health: "Apple Healt
 
 const REVISIONS_KEY = "triptrace.revisions";
 const DELAY_CHOICES = [["On time", 0], ["+15", 15], ["+30", 30], ["+60", 60], ["+120", 120]];
+// Only promise "paste" where a paste can actually be received — see the clipboard button below.
+const DROP_NOTE = navigator.clipboard?.read
+  ? "Tap to choose · or paste · or drop"
+  : "Tap to choose · or drop";
 
 const state = {
   carrier: "ups",
@@ -584,7 +588,7 @@ $("text").addEventListener("input", () => {
     state.file = null;
     $("drop").classList.remove("loaded");
     $("drop-lead").textContent = "Add Trip Board screenshot";
-    $("drop-note").textContent = "Tap to choose · or paste · or drop";
+    $("drop-note").textContent = DROP_NOTE;
   }
   refreshRunButton();
 });
@@ -597,7 +601,7 @@ $("restart").addEventListener("click", () => {
   try { localStorage.removeItem(REVISIONS_KEY); } catch (_) { /* fine */ }
   $("drop").classList.remove("loaded");
   $("drop-lead").textContent = "Add Trip Board screenshot";
-  $("drop-note").textContent = "Tap to choose · or paste · or drop";
+  $("drop-note").textContent = DROP_NOTE;
   refreshRunButton();
   show("input");
 });
@@ -607,11 +611,61 @@ $("reparse").addEventListener("click", () => {
   analyze();
 });
 
+/**
+ * Pull an image out of a clipboard payload.
+ *
+ * Two shapes have to be handled: `files`, which is what Chrome fills in, and `items`, which is
+ * where Safari puts a copied image and where a screenshot sometimes lands even in Chrome. Reading
+ * only `files` is why pasting a screenshot silently did nothing for some pilots.
+ */
+function imageFromClipboard(data) {
+  if (!data) return null;
+  const direct = [...(data.files ?? [])].find((f) => f.type.startsWith("image/"));
+  if (direct) return direct;
+  for (const item of data.items ?? []) {
+    if (item.kind === "file" && item.type.startsWith("image/")) {
+      const file = item.getAsFile();
+      if (file) return file;
+    }
+  }
+  return null;
+}
+
 document.addEventListener("paste", (e) => {
-  if (document.activeElement?.tagName === "TEXTAREA") return;
-  const file = [...(e.clipboardData?.files ?? [])][0];
-  if (file?.type.startsWith("image/")) { e.preventDefault(); acceptScreenshot(file); }
+  // An image on the clipboard is a screenshot no matter where the caret is: pasting a picture
+  // into the transcript box used to be swallowed in silence. Text still pastes wherever focus is.
+  const file = imageFromClipboard(e.clipboardData);
+  if (!file) return;
+  e.preventDefault();
+  acceptScreenshot(file);
 });
+
+// iOS Safari only fires `paste` into an editable field, so the keyboard/long-press route above
+// can never run on a phone. navigator.clipboard.read() is the one that does, and it needs a real
+// tap plus the platform's own permission prompt — hence a button rather than an automatic read.
+$("drop-note").textContent = DROP_NOTE;
+if (navigator.clipboard?.read) {
+  $("paste-shot").hidden = false;
+  $("paste-shot").addEventListener("click", async () => {
+    const note = $("drop-note");
+    try {
+      const items = await navigator.clipboard.read();
+      for (const item of items) {
+        const type = item.types.find((t) => t.startsWith("image/"));
+        if (!type) continue;
+        const blob = await item.getType(type);
+        acceptScreenshot(new File([blob], "pasted-screenshot.png", { type }));
+        return;
+      }
+      note.textContent = "No picture on the clipboard — copy your Trip Board screenshot first.";
+    } catch (err) {
+      // Denied permission, an empty clipboard, or a browser that refuses outside a user gesture.
+      note.textContent = err.name === "NotAllowedError"
+        ? "Clipboard access was blocked — use “Tap to choose” and pick the screenshot instead."
+        : "Could not read the clipboard — use “Tap to choose” and pick the screenshot instead.";
+    }
+  });
+}
 
 for (const [zone, handler] of [["drop", acceptScreenshot], ["sleep-drop", importSleep]]) {
   const el = $(zone);
@@ -632,7 +686,7 @@ $("safety-open").addEventListener("click", () => {
   $("safety-sheet").hidden = false;
 });
 
-// ── Fatigue summary ─────────────────────────────────────────────────────────
+// ── Safety summary ──────────────────────────────────────────────────────────
 
 let summaryModule = null;
 async function currentSummary() {
@@ -689,7 +743,7 @@ function renderSummary(model) {
   $("summary-doc").innerHTML = `
     <div class="masthead">
       <div class="wordmark"><span class="a">TRIP</span><span class="b">TRACE</span></div>
-      <div class="eyebrow">Fatigue risk summary${h && h.updated ? " — updated" : ""}</div>
+      <div class="eyebrow">Safety risk summary${h && h.updated ? " — updated" : ""}</div>
     </div>
     <h1>${esc(model.title)}</h1>
     <div class="meta">${esc(model.subtitle)}</div>
@@ -706,7 +760,7 @@ function renderSummary(model) {
 
     ${h ? `
       <div class="box assess" style="border-left-color:${bandVar(h.band)}">
-        <h3>${h.updated ? "Updated current" : "Current"} fatigue assessment</h3>
+        <h3>${h.updated ? "Updated current" : "Current"} safety assessment</h3>
         <div class="big">Trip minimum effectiveness: ${Math.round(h.minPct)}% <span style="color:${bandVar(h.band)}">${esc(h.bandLabel)}</span></div>
         <p>At ${esc(h.where)}${h.at ? ` (${esc(h.at)})` : ""}. ${esc(h.bac[0].toUpperCase() + h.bac.slice(1))}.
           ${h.fatigueCallIndicated ? "A fatigue call is professionally defensible at this level." : "Above the fatigue-call threshold."}</p>
@@ -782,20 +836,14 @@ function renderSummary(model) {
 
     ${model.assessment ? `<h2>Assessment</h2><p>${esc(model.assessment).replace(/\n/g, "<br>")}</p>` : ""}
     ${model.statement ? `<h2>Statement</h2><p>${esc(model.statement).replace(/\n/g, "<br>")}</p>` : ""}
-
-    <h2>Model notes</h2>
-    <p class="notes">${esc(model.modelAssumptions)}</p>
-    <p class="notes">${esc(model.circadian)}</p>
-    <p class="notes">${esc(model.uncertainty)}</p>
-    <p class="notes">${esc(model.reminder)}</p>
-    <p class="notes">${esc(model.engine)}</p>`;
+`;
 }
 
 async function summaryFile() {
   const [{ summaryPdf }, model] = await Promise.all([import(`./pdf.js?v=${V}`), currentSummary()]);
   const bytes = summaryPdf(model);
   const id = (state.payload?.trace?.pairing?.pairing_id || "trip").replace(/[^A-Za-z0-9]/g, "");
-  return new File([bytes], `TripTrace-${id}-fatigue-summary.pdf`, { type: "application/pdf" });
+  return new File([bytes], `TripTrace-${id}-safety-summary.pdf`, { type: "application/pdf" });
 }
 
 $("summary-open").addEventListener("click", async () => {
