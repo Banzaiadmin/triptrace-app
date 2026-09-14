@@ -391,6 +391,38 @@ details.log .log-state { font-weight: 500; color: var(--red); font-size: 12.5px;
 .summary .notes { font-size: 11.5px; color: var(--sub); line-height: 1.55; }
 .summary .revised { color: var(--red); font-weight: 600; margin-top: 8px; }
 .summary .table-scroll { overflow-x: auto; }
+
+/* On a phone the summary tables stack: each row becomes a card whose cells carry their column
+ * name from data-l. Horizontal scrolling was hiding the Start/Low/End numbers off the right edge
+ * and squeezing the last column until rows stood 180px tall — the one view a pilot reads at the
+ * gate was the one that did not fit the screen. The print block below restores the real table. */
+@media (max-width: 560px) {
+  .summary .table-scroll { overflow-x: visible; }
+  .summary .table-scroll table,
+  .summary .table-scroll tbody,
+  .summary .table-scroll tr,
+  .summary .table-scroll td { display: block; }
+  .summary .table-scroll thead { display: none; }
+  .summary .table-scroll tr {
+    background: var(--card); border-radius: 12px; padding: 10px 12px; margin-bottom: 8px;
+  }
+  .summary .table-scroll td {
+    display: flex; gap: 12px; justify-content: space-between; align-items: baseline;
+    padding: 3px 0; border-bottom: 0; white-space: normal;
+  }
+  .summary .table-scroll td::before {
+    content: attr(data-l); flex: 0 0 auto; white-space: nowrap;
+    font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--sub);
+  }
+  .summary .table-scroll td .v { text-align: right; overflow-wrap: anywhere; min-width: 0; }
+  .summary .table-scroll td.num .v { white-space: nowrap; }
+  .summary .table-scroll td.rowhead {
+    display: block; font-size: 14px;
+    padding: 0 0 6px; margin-bottom: 4px; border-bottom: 1px solid var(--hair);
+  }
+  .summary .table-scroll td.rowhead::before { content: none; }
+  .summary .table-scroll td.rowhead .v { text-align: left; }
+}
 .summary .tiles { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin: 14px 0; }
 @media (max-width: 560px) { .summary .tiles { grid-template-columns: repeat(3, 1fr); } }
 .summary .tile { background: var(--card); border-radius: 12px; padding: 10px 6px; text-align: center; }
@@ -430,4 +462,17 @@ details.log .log-state { font-weight: 500; color: var(--red); font-size: 12.5px;
   .summary h2 { break-after: avoid; }
   .summary table, .summary .headline, .summary tr { break-inside: avoid; }
   .summary .table-scroll { overflow: visible; }
+  /* A phone printing to PDF can match the narrow-screen query above; paper always gets the table. */
+  .summary .table-scroll table { display: table; }
+  .summary .table-scroll thead { display: table-header-group; }
+  .summary .table-scroll tbody { display: table-row-group; }
+  .summary .table-scroll tr { display: table-row; background: none; padding: 0; margin: 0; }
+  .summary .table-scroll td {
+    display: table-cell; text-align: left; padding: 7px 6px 7px 0;
+    border-bottom: 1px solid var(--hair);
+  }
+  .summary .table-scroll td::before { content: none; }
+  .summary .table-scroll td.rowhead {
+    display: table-cell; font-size: inherit; margin: 0; padding: 7px 6px 7px 0;
+  }
 }

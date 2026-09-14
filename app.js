@@ -16,7 +16,7 @@ const $ = (id) => document.getElementById(id);
 const LAST_KEY = "triptrace.last";
 const INSTALL_DISMISSED_KEY = "triptrace.install-dismissed";
 // Bump together with ASSET_VERSION in sw.js and the ?v= in index.html.
-const V = "9";
+const V = "10";
 
 // The on-device engine, loaded lazily so a browser that cannot run it still has the service path.
 let engine = null;
@@ -653,25 +653,33 @@ function renderSummary(model) {
       <div class="tl">${esc(t.label)}</div>
     </div>`).join("");
   const facts = model.facts.map(([k, v]) => `<div><span>${esc(k)}</span><span>${esc(v)}</span></div>`).join("");
+  // data-l carries each cell's column name so the narrow-screen rules can stack a row into a
+  // labelled card. Below ~560px the eight duty columns cannot share a line without pushing the
+  // effectiveness numbers — the whole point of the table — off the right edge.
+  // Every cell's value is wrapped in one .v span and the column name rides along in data-l.
+  // Below ~560px the stacked rules turn each cell into "LABEL … value": the label is the td's
+  // ::before and .v is the only other child, so a <br> inside a value still breaks the line
+  // instead of being split into a second column.
+  const cell = (attrs, html) => `<td ${attrs}><span class="v">${html}</span></td>`;
   const duties = model.duties.map((d) => `
     <tr>
-      <td class="num"><b>D${d.day}</b><br><span class="sub">${esc(d.date)}</span></td>
-      <td>${esc(d.sequence)}${d.deadheads ? `<br><span class="sub">${d.deadheads} deadhead${d.deadheads === 1 ? "" : "s"}</span>` : ""}</td>
-      <td class="num">${esc(d.report)}<br>→ ${esc(d.release)}</td>
-      <td class="num">${d.actualDuty ? `<span class="short">${esc(d.actualDuty)}</span>` : esc(d.duty)}<br><span class="sub">${d.landings} ldg</span></td>
-      <td class="num">${chip(d.startPct, d.startBand)}</td>
-      <td class="num">${chip(d.minPct, d.band)}${d.combined !== null ? `<br><span class="sub">CC ${d.combined}%</span>` : ""}</td>
-      <td class="num">${chip(d.endPct, d.endBand)}</td>
-      <td class="sub">${esc(d.minWhere)}${d.minAt ? ` · ${esc(d.minAt)}` : ""}<br>then ${esc(d.layover)}</td>
+      ${cell('class="num rowhead" data-l="Day"', `<b>D${d.day}</b><br><span class="sub">${esc(d.date)}</span>`)}
+      ${cell('data-l="Sequence"', `${esc(d.sequence)}${d.deadheads ? `<br><span class="sub">${d.deadheads} deadhead${d.deadheads === 1 ? "" : "s"}</span>` : ""}`)}
+      ${cell('class="num" data-l="Report → release"', `${esc(d.report)}<br>→ ${esc(d.release)}`)}
+      ${cell('class="num" data-l="Duty"', `${d.actualDuty ? `<span class="short">${esc(d.actualDuty)}</span>` : esc(d.duty)}<br><span class="sub">${d.landings} ldg</span>`)}
+      ${cell('class="num" data-l="Start"', chip(d.startPct, d.startBand))}
+      ${cell('class="num" data-l="Low"', `${chip(d.minPct, d.band)}${d.combined !== null ? `<br><span class="sub">CC ${d.combined}%</span>` : ""}`)}
+      ${cell('class="num" data-l="End"', chip(d.endPct, d.endBand))}
+      ${cell('class="sub" data-l="Where · then"', `${esc(d.minWhere)}${d.minAt ? ` · ${esc(d.minAt)}` : ""}<br>then ${esc(d.layover)}`)}
     </tr>`).join("");
   const sleep = model.sleep.map((s) => `
     <tr>
-      <td class="num"><b>D${s.afterDay}</b></td>
-      <td>${esc(s.station)}</td>
-      <td class="num">${esc(s.layover)}</td>
-      <td class="num">${esc(s.opportunity)}</td>
-      <td class="num ${s.short ? "short" : ""}">${esc(s.effective)}</td>
-      <td class="sub">${s.blocks.map(esc).join("<br>") || "none modeled"}</td>
+      ${cell('class="num rowhead" data-l="After"', `<b>D${s.afterDay}</b>`)}
+      ${cell('data-l="Station"', esc(s.station))}
+      ${cell('class="num" data-l="Layover"', esc(s.layover))}
+      ${cell('class="num" data-l="Opportunity"', esc(s.opportunity))}
+      ${cell(`class="num ${s.short ? "short" : ""}" data-l="Effective"`, esc(s.effective))}
+      ${cell('class="sub" data-l="Modeled blocks"', s.blocks.map(esc).join("<br>") || "none modeled")}
     </tr>`).join("");
   const h = model.headline;
   const t = model.today;
