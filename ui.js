@@ -12,9 +12,9 @@
  * Where the pilot is right now is shown by position on the chart, not by a made-up percentage.
  */
 
-import { traceModel, renderTrace, sparkline, bandFor, bandColor, bandVar } from "./trace.js?v=18";
+import { traceModel, renderTrace, sparkline, bandFor, bandColor, bandVar } from "./trace.js?v=19";
 
-const V = "18";
+const V = "19";
 const $ = (id) => document.getElementById(id);
 const LAST_KEY = "triptrace.last";
 const REVISIONS_KEY = "triptrace.revisions";
@@ -244,10 +244,10 @@ function renderAll() {
   }
   $("tabbar").hidden = false;
   $("trip-pill").hidden = false;
-  const lowPct = t.outputs?.min_effectiveness_pct ?? null;
+  state.tmodel = traceModel(t);          // must precede the pill: its fallback reads this model
+  const lowPct = t.outputs?.trip_min_effectiveness_pct ?? state.tmodel?.lowest?.pct ?? null;
   $("trip-pill").innerHTML = `<b>${esc(t.pairing?.pairing_id ?? "Trip")}</b>${
     lowPct === null ? "" : ` · <span style="color:${bandColor(lowPct)}">${esc(pct(lowPct))}</span>`}`;
-  state.tmodel = traceModel(t);
   renderTrip();
   renderNow();
   renderRest();
@@ -260,7 +260,10 @@ function renderAll() {
 function renderTrip() {
   const t = trace();
   const out = t.outputs ?? {};
-  const low = out.min_effectiveness_pct ?? state.tmodel?.lowest?.pct ?? null;
+  // The engine names this `trip_min_effectiveness_pct`; the curve's own minimum is only a fallback
+  // for a trace that could not be scored. They agreed on every sample, which is exactly why a typo
+  // here would never have surfaced.
+  const low = out.trip_min_effectiveness_pct ?? state.tmodel?.lowest?.pct ?? null;
   const band = bandFor(low ?? 100);
 
   drawRing(low ?? 0, band);
