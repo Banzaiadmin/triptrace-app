@@ -31,8 +31,8 @@ import {
   REPORT_ALLOWANCE_HOURS,
   SLEEP_OPPORTUNITY_SUBTRACTIONS,
   STATIONS,
-} from "./constants.js?v=24";
-import { deepCopy, hmFromMinutes, pyFmt, pyRepr, pyRound, splitLines, uniqueInOrder } from "./py.js?v=24";
+} from "./constants.js?v=25";
+import { deepCopy, hmFromMinutes, pyFmt, pyRepr, pyRound, splitLines, uniqueInOrder } from "./py.js?v=25";
 import {
   HOUR,
   MINUTE,
@@ -43,7 +43,7 @@ import {
   localParts,
   localToUtc,
   utcOffsetMinutes,
-} from "./tz.js?v=24";
+} from "./tz.js?v=25";
 
 /** Raised only when the text contains no recognizable Trip Board rows at all. */
 export class ParseError extends Error {}
@@ -265,6 +265,48 @@ function parseFooter(line) {
 }
 
 /** A duty period is a run of leg rows terminated by its summary row. */
+// A ground gap at least this long is a rest period, not a sit. See trip_board_parser.py.
+const MIN_GAP_THAT_IS_REST_HOURS = Math.min(
+  ...Object.values(CONTRACT_REST_FLOORS).map((f) => f.reducible_to),
+);
+
+/**
+ * Split a run of legs wherever the clock says a rest period sits between them. A totals row the
+ * reader loses silently welds two duty periods into one; the clock is the check the layout cannot
+ * corrupt. Same reasoning, and the same worked example, as trip_board_parser.py.
+ */
+function splitOnRestSizedGaps(legs, missing) {
+  const runs = [[legs[0]]];
+  for (let i = 1; i < legs.length; i += 1) {
+    const previous = legs[i - 1], leg = legs[i];
+    const gapHours = (previous.arrUtc !== null && previous.arrUtc !== undefined
+      && leg.depUtc !== null && leg.depUtc !== undefined)
+      ? (leg.depUtc - previous.arrUtc) / HOUR : null;
+    if (gapHours !== null && gapHours >= MIN_GAP_THAT_IS_REST_HOURS) {
+      missing.add(
+        "time_conflict",
+        `${previous.flight} arrives ${fmtGap(previous.arrUtc)} and ${leg.flight} departs `
+          + `${fmtGap(leg.depUtc)}, a gap of ${hmFromMinutes(Math.round(gapHours * 60))}. `
+          + "That is a rest period, not a sit, so these were split into separate duty periods — "
+          + "the totals row between them was not read.",
+        "The printed Duty and L/O for the earlier duty period; report and release for it "
+          + "fall back to spec 2C defaults.",
+      );
+      runs.push([leg]);
+    } else {
+      runs[runs.length - 1].push(leg);
+    }
+  }
+  return runs;
+}
+
+const fmtGap = (ms) => {
+  const d = new Date(ms);
+  const month = d.toLocaleString("en-US", { month: "short", timeZone: "UTC" });
+  return `${String(d.getUTCDate()).padStart(2, "0")} ${month} `
+    + `${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")}Z`;
+};
+
 function groupDutyPeriods(rows, missing) {
   const groups = [];
   let pending = [];
@@ -280,11 +322,17 @@ function groupDutyPeriods(rows, missing) {
         );
         continue;
       }
-      groups.push({ legs: pending, summary: row });
+      // The summary row belongs to the last run; anything split off ahead of it lost its own.
+      const runs = splitOnRestSizedGaps(pending, missing);
+      for (const run of runs.slice(0, -1)) groups.push({ legs: run, summary: null });
+      groups.push({ legs: runs[runs.length - 1], summary: row });
       pending = [];
     }
   }
   if (pending.length) {
+    const runs = splitOnRestSizedGaps(pending, missing);
+    for (const run of runs.slice(0, -1)) groups.push({ legs: run, summary: null });
+    pending = runs[runs.length - 1];
     missing.add(
       "cut_off",
       `${pending.length} flight row(s) after the last summary line — the duty totals row is missing ` +
@@ -581,9 +629,16 @@ export function parseTripBoard(text, {
     });
 
     const circadian = buildCircadian(reportUtc, releaseUtc, domicileTz, index);
+
+    let nextReport = null;
+    if (index + 1 < groups.length) {
+      const nextTimed = groups[index + 1].legs.filter((l) => l.depUtc !== null);
+      if (nextTimed.length) nextReport = nextTimed[0].depUtc - allowances[index + 1][0] * MINUTE;
+    }
+
     const layover = buildLayover(
       summary, timed.length ? timed[timed.length - 1].arrStation : null, domicile,
-      stationTzOverrides, index === groups.length - 1, missing,
+      stationTzOverrides, index === groups.length - 1, missing, releaseUtc, nextReport,
     );
 
     dutyPeriods.push({
@@ -605,11 +660,6 @@ export function parseTripBoard(text, {
     });
 
     if (layover !== null) {
-      let nextReport = null;
-      if (index + 1 < groups.length) {
-        const nextTimed = groups[index + 1].legs.filter((l) => l.depUtc !== null);
-        if (nextTimed.length) nextReport = nextTimed[0].depUtc - allowances[index + 1][0] * MINUTE;
-      }
       restPeriods.push(buildRestPeriod(index + 1, layover, releaseUtc, nextReport));
     }
   });
@@ -773,20 +823,36 @@ function buildCircadian(reportUtc, releaseUtc, domicileTz, dayIndex0) {
   };
 }
 
-function buildLayover(summary, station, domicile, overrides, isLastDay, missing) {
+function buildLayover(summary, station, domicile, overrides, isLastDay, missing,
+                     releaseUtc = null, nextReportUtc = null) {
+  let source = "printed";
+  let lengthHours;
   if (summary === null || summary.layoverMin === null) {
-    if (!isLastDay) {
+    if (isLastDay) return null;
+    // The L/O column is gone, but the clock is not — see trip_board_parser.py for why this matters.
+    if (releaseUtc !== null && nextReportUtc !== null && nextReportUtc > releaseUtc) {
+      lengthHours = (nextReportUtc - releaseUtc) / HOUR;
+      source = "computed";
+      missing.add(
+        "ambiguous",
+        `No L/O printed after the duty period ending at ${station || "?"}; the layover was taken `
+          + `from the clock instead (${hmFromMinutes(Math.round(lengthHours * 60))} from release `
+          + "to the next report).",
+        "Nothing, unless the printed L/O differed from the scheduled gap.",
+      );
+    } else {
       missing.add(
         "cut_off",
         `No L/O printed after the duty period ending at ${station || "?"}.`,
         "Rest length and sleep opportunity for this layover.",
       );
+      return null;
     }
-    return null;
+  } else if (summary.layoverMin === 0) {
+    return null;                                           // 0:00 L/O = end of trip
+  } else {
+    lengthHours = minutesToHours(summary.layoverMin);
   }
-  if (summary.layoverMin === 0) return null;               // 0:00 L/O = end of trip, not a zero-length rest
-
-  const lengthHours = minutesToHours(summary.layoverMin);
   const atDomicile = Boolean(station) && station.toUpperCase() === domicile.toUpperCase();
   const domestic = station ? isDomestic(station, overrides) : null;
   const international = domestic === false;
@@ -800,7 +866,7 @@ function buildLayover(summary, station, domicile, overrides, isLastDay, missing)
   return {
     station,
     length_hours: lengthHours,
-    source: "printed",
+    source,
     is_domicile: atDomicile,
     is_international: international,
     contract_floor_hours: floor.min,

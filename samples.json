@@ -46,5 +46,13 @@
     "summary": "2 duty periods \u00b7 3 legs \u00b7 SDF 757 \u00b7 TAFB 81:01",
     "note": "One leg out to Sacramento Mather, a 67:50 layover, then home through PHX. The footer says 4 duty days because the trip spans four calendar dates. Transcribed from a real Trip Board on 2026-09-14.",
     "text": "Trip Details - S5100 - SDF 757\nEqp Date Pairing Flt Pos Dep (L) Z Arr (L) Z Blk Duty Cr L/O\n9/19/26 S51001 956 CPT SDF (SA04)08:56 MHR (06)13:25 4:29\n4:29 5:44 4:29L 67:50\n9/22/26 S51001 9866 CPT MHR (TU03)10:30 PHX (05)12:18 1:48\n9/22/26 S51001 2865 CPT PHX (TU06)13:30 SDF (12)16:42 3:12\n5:00 7:27 5:00L 0:00\nCredit: 21:36T Out Credit: 0:00 Blk: 9:29 Prem: $0.00 PDiem: $283.56 TAFB: 81:01 Duty Days: 4\n"
+  },
+  {
+    "id": "ups-Z55305",
+    "carrier": "ups",
+    "label": "UPS Z55305",
+    "summary": "6 duty periods \u00b7 11 legs \u00b7 SDF 757 \u00b7 TAFB 137:03",
+    "note": "Opens with two commercial deadheads to CLE, then four consecutive overnight duties through PHL, CAE, ICT and ONT before IAH home. Transcribed from a real Trip Board on 2026-09-15.",
+    "text": "Trip Details - Z5530 - SDFZ 757\nEqp Date Pairing Flt Pos Dep (L) Z Arr (L) Z Blk Duty Cr L/O\n9/13/26 Z55305 CML F/O SDF (SU18)22:03 ATL (19)23:30 0:00\n9/14/26 Z55305 CML F/O ATL (SU20)00:35 CLE (22)02:20 0:00\n0:00 5:32 4:00M 22:09\n9/15/26 Z55305 1445 F/O CLE (MO21)01:44 PHL (22)02:58 1:14\n9/15/26 Z55305 1198 F/O PHL (TU03)07:12 CAE (04)08:40 1:28\n2:42 8:11 5:27E 15:16\n9/16/26 Z55305 1291 F/O CAE (TU21)01:11 SDF (22)02:25 1:14\n9/16/26 Z55305 672 F/O SDF (WE04)08:52 ICT (05)10:46 1:54\n3:08 10:50 7:13E 13:59\n9/17/26 Z55305 671 F/O ICT (WE21)02:00 SDF (23)03:43 1:43\n9/17/26 Z55305 918 F/O SDF (TH03)07:31 ONT (04)11:45 4:14\n5:57 11:00 7:20E 12:47\n9/18/26 Z55305 915 F/O ONT (TH18)01:47 SDF (01)05:29 3:42\n9/18/26 Z55305 772 F/O SDF (FR03)07:10 IAH (04)09:18 2:08\n5:50 8:46 5:51E 25:12\n9/19/26 Z55305 5771 F/O IAH (SA06)11:45 SDF (09)13:51 2:06\n2:06 3:21 4:00M 0:00\nCredit: 36:33T Out Credit: 0:00 Blk: 19:43 Prem: $0.00 PDiem: $479.68 TAFB: 137:03 Duty Days: 6\n"
   }
 ]
