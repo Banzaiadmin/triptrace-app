@@ -18,6 +18,8 @@
   Cache-Control: public, max-age=31536000, immutable
 /trace.js
   Cache-Control: public, max-age=31536000, immutable
+/card.js
+  Cache-Control: public, max-age=31536000, immutable
 
 # The on-device core is imported by unversioned module specifiers, so it must revalidate too
 # (ETags make that cheap). Same for the sample pairings the app loads without a server.

@@ -12,9 +12,9 @@
  * Where the pilot is right now is shown by position on the chart, not by a made-up percentage.
  */
 
-import { traceModel, renderTrace, sparkline, bandFor, bandColor, bandVar, EFF_THRESHOLD } from "./trace.js?v=25";
+import { traceModel, renderTrace, sparkline, bandFor, bandColor, bandVar, EFF_THRESHOLD } from "./trace.js?v=26";
 
-const V = "25";
+const V = "26";
 const $ = (id) => document.getElementById(id);
 const LAST_KEY = "triptrace.last";
 const REVISIONS_KEY = "triptrace.revisions";
@@ -353,12 +353,48 @@ function renderTrip() {
     row.addEventListener("click", () => openDuty(Number(row.dataset.day)));
   }
 
+  renderExposure(t);
+
   const watch = report()?.watch ?? [];
   $("trip-watch").innerHTML = watch.length
     ? watch.map((w) => `<li>${esc(w)}</li>`).join("")
     : `<li class="sub">Nothing flagged beyond the duty detail above.</li>`;
 
   renderScopes();
+}
+
+/**
+ * Flight time against fatigue exposure. The 30-hour figure is the reference used for the
+ * 30-in-7 flight-time limit, shown as a scale and nothing more: the panel exists precisely
+ * because a trip can sit comfortably inside a block-time limit while duty, positioning and
+ * nights away pile up underneath it. Every figure is read off the trace; none is a ruling.
+ */
+function renderExposure(t) {
+  const p = t.pairing ?? {};
+  const duties = t.duty_periods ?? [];
+  const block = p.total_block_hours ?? 0;
+  const duty = duties.reduce((a, d) => a + ((d.scheduled_duty?.actual_hours ?? d.scheduled_duty?.scheduled_hours) ?? 0), 0);
+  const deadhead = duties.flatMap((d) => d.legs ?? [])
+    .filter((l) => /^DH|deadhead/i.test(l.position ?? "") || l.is_deadhead)
+    .reduce((a, l) => a + ((Date.parse(l.arr?.utc) - Date.parse(l.dep?.utc)) / 3600e3 || 0), 0);
+  const nights = duties.filter((d) => {
+    const w = d.circadian?.wocl_window;
+    return w && Date.parse(d.report?.utc) < Date.parse(w.end_utc) && Date.parse(d.release?.utc) > Date.parse(w.start_utc);
+  }).length;
+  const low = t.outputs?.trip_min_effectiveness_pct ?? null;
+  const REF = 30;
+  $("exposure").innerHTML = `
+    <div class="exp-grid">
+      <div><div class="v">${esc(hm(block))}</div><div class="l">Operating block</div></div>
+      <div><div class="v">${esc(hm(duty))}</div><div class="l">Duty exposure</div></div>
+      <div><div class="v">${esc(hm(deadhead))}</div><div class="l">Positioning</div></div>
+      <div><div class="v">${esc(hm(p.tafb_hours))}</div><div class="l">Time away</div></div>
+      <div><div class="v">${nights}</div><div class="l">Duties touching the WOCL</div></div>
+      <div><div class="v" style="color:${low === null ? "inherit" : bandColor(low)}">${esc(pct(low))}</div><div class="l">Trip minimum</div></div>
+    </div>
+    <div class="exp-bar"><i style="transform:scaleX(${Math.min(1, block / REF).toFixed(3)})"></i></div>
+    <div class="exp-note"><span>Block ${esc(hm(block))} of a ${REF}:00 reference</span><span>${esc(hm(Math.max(0, REF - block)))} remaining</span></div>
+    <p class="sub small" style="margin:12px 0 0">Regulatory flight-time compliance and physiological fatigue are related but not equivalent measures.</p>`;
 }
 
 function drawRing(value, band) {
@@ -962,6 +998,44 @@ $("summary-share").addEventListener("click", async () => {
   }
 });
 $("summary-print").addEventListener("click", () => { $("summary-status").textContent = ""; window.print(); });
+
+// The one-page card: a phone-sized PNG drawn from the summary model, for sending by text.
+$("summary-card").addEventListener("click", async () => {
+  $("summary-status").textContent = "Drawing the card…";
+  try {
+    const [{ summaryCard }, model] = await Promise.all([import(`./card.js?v=${V}`), currentSummary()]);
+    const blob = await summaryCard(model);
+    const id = (trace()?.pairing?.pairing_id ?? "trip").replace(/[^A-Za-z0-9]/g, "");
+    const file = new File([blob], `TripTrace-${id}-summary.png`, { type: "image/png" });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({ files: [file], title: file.name });
+      $("summary-status").textContent = "Shared.";
+      return;
+    }
+    const url = URL.createObjectURL(file);
+    const a = document.createElement("a");
+    a.href = url; a.download = file.name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+    $("summary-status").textContent = `Saved ${file.name}.`;
+  } catch (err) {
+    $("summary-status").textContent = err.name === "AbortError" ? "" : `Could not draw the card: ${err.message}`;
+  }
+});
+
+// Desktop only: the Trip Board is open in another window, so read it straight off the screen.
+if (window.triptraceDesktop?.captureScreen) {
+  $("capture-shot").hidden = false;
+  $("capture-shot").addEventListener("click", async () => {
+    try {
+      const bytes = await window.triptraceDesktop.captureScreen();
+      setSource("shot");
+      acceptScreenshot(new File([bytes], "screen-capture.png", { type: "image/png" }));
+    } catch (err) {
+      $("drop-note").textContent = `Could not capture the screen: ${err.message}`;
+    }
+  });
+}
 $("summary-copy").addEventListener("click", async () => {
   summaryMod = summaryMod || await import(`./core/summary.js?v=${V}`);
   copyText(summaryMod.summaryText(await currentSummary()), "Copied as text.");

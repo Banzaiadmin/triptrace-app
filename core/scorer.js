@@ -25,13 +25,13 @@ import {
   SLEEP_OPPORTUNITY_SUBTRACTIONS,
   SCORER_CALIBRATION as CAL,
   WORKLOAD,
-} from "./constants.js?v=25";
-import { deepCopy, hmFromHours, minBy, pyFloatStr, pyFmt, pyRound } from "./py.js?v=25";
-import { fmtUtc, parseUtc } from "./tz.js?v=25";
+} from "./constants.js?v=26";
+import { deepCopy, hmFromHours, minBy, pyFloatStr, pyFmt, pyRound } from "./py.js?v=26";
+import { fmtUtc, parseUtc } from "./tz.js?v=26";
 
 // Re-exported for the browser harness and older importers.
-export { pyRound } from "./py.js?v=25";
-export { fmtUtc, parseUtc } from "./tz.js?v=25";
+export { pyRound } from "./py.js?v=26";
+export { fmtUtc, parseUtc } from "./tz.js?v=26";
 
 export class ScoringError extends Error {}
 
@@ -74,6 +74,28 @@ export function circadian(bodyHour) {
     (4 * Math.PI * (bodyHour - CAL.circadian_peak_hour - CAL.second_harmonic_offset_hours)) / 24,
   );
   return first + CAL.second_harmonic_weight * second;
+}
+
+// Circadian multiplier on sleep intensity — see scorer.py for the reasoning. Built once, per
+// minute of the body-clock day, in the same arithmetic order as Python so the two agree exactly.
+function buildSleepPropensity() {
+  const centre = (hhmmToHours(MODEL_PARAMS.wocl_body_clock_start) + hhmmToHours(MODEL_PARAMS.wocl_body_clock_end)) / 2;
+  const grid = [];
+  for (let m = 0; m < 1440; m += 1) grid.push(Math.cos((2 * Math.PI * (m / 60 - centre)) / 24));
+  const raw = grid.map((c) => CAL.sleep_propensity_floor + (1 - CAL.sleep_propensity_floor) * ((c + 1) / 2));
+  let nightSum = 0, nightCount = 0;
+  for (let m = 0; m < 1440; m += 1) {
+    const h = m / 60;
+    if (h >= CAL.body_night_start_hour || h < CAL.body_night_end_hour) { nightSum += raw[m]; nightCount += 1; }
+  }
+  const nightMean = nightSum / nightCount;
+  return raw.map((v) => v / nightMean);
+}
+const SLEEP_PROPENSITY = buildSleepPropensity();
+
+export function sleepPropensity(bodyHour) {
+  const minute = pyRound(((bodyHour % 24) + 24) % 24 * 60) % 1440;
+  return SLEEP_PROPENSITY[minute];
 }
 
 export function sleepIntensity(reservoir, capacity) {
@@ -391,7 +413,8 @@ function integrate(sleeps, tripStart, tripEnd, clock) {
     if (active !== null) {
       reservoir = Math.min(
         capacity,
-        reservoir + sleepIntensity(reservoir, capacity) * active.efficiency * CAL.step_minutes,
+        reservoir + sleepIntensity(reservoir, capacity) * active.efficiency
+          * sleepPropensity(clock.hour(when)) * CAL.step_minutes,
       );
       lastWake = null;
     } else {

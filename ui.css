@@ -465,6 +465,15 @@ body.sheet-open .app {
 .bullets li { margin-bottom: 8px; font-size: 13.5px; }
 .bullets li:last-child { margin-bottom: 0; }
 
+/* ── Exposure panel ────────────────────────────────────────────────────── */
+.exp-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px 18px; }
+.exp-grid .v { font-size: 20px; font-weight: 750; letter-spacing: -0.02em; }
+.exp-grid .l { font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--dim); margin-top: 2px; }
+.exp-bar { height: 8px; border-radius: 99px; background: var(--raised); overflow: hidden; margin: 14px 0 6px; }
+.exp-bar i { display: block; height: 100%; border-radius: 99px; background: var(--accent); transform-origin: 0 50%;
+  animation: fill 900ms var(--ease-out) 200ms both; }
+.exp-note { display: flex; justify-content: space-between; font-size: 11.5px; color: var(--sub); }
+
 /* ── Now ───────────────────────────────────────────────────────────────── */
 
 .phase-card { background: var(--surface); border: 1px solid var(--hair-soft); border-radius: var(--radius); padding: 20px 18px; }

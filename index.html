@@ -20,7 +20,7 @@
 <title>TripTrace</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-192.png">
-<link rel="stylesheet" href="ui.css?v=25">
+<link rel="stylesheet" href="ui.css?v=26">
 
 <div class="app" id="app">
 
@@ -106,6 +106,13 @@
       <section class="block">
         <div class="block-head"><h2>Duty days</h2></div>
         <div id="duty-list" class="stack"></div>
+      </section>
+
+      <section class="block">
+        <div class="block-head">
+          <h2>Flight time vs fatigue exposure</h2>
+        </div>
+        <div class="card" id="exposure"></div>
       </section>
 
       <section class="block">
@@ -199,6 +206,7 @@
           <span class="drop-note" id="drop-note">Tap to choose · or drop</span>
         </button>
         <button class="btn btn-quiet" id="paste-shot" type="button" hidden>Paste from clipboard</button>
+        <button class="btn btn-quiet" id="capture-shot" type="button" hidden>Capture the screen</button>
         <input id="file" type="file" accept="image/png,image/jpeg,image/gif,image/webp" hidden>
       </div>
 
@@ -345,6 +353,7 @@
     <div class="sheet-body">
       <div class="sheet-actions">
         <button class="btn btn-primary" id="summary-share">Download PDF</button>
+        <button class="btn btn-quiet" id="summary-card">Save as a picture for texting</button>
         <button class="btn btn-quiet" id="summary-print">Print or save as PDF</button>
         <button class="btn btn-quiet" id="summary-copy">Copy as text</button>
       </div>
@@ -359,4 +368,4 @@
   <p id="working-text">Reading the trip</p>
 </div>
 
-<script type="module" src="ui.js?v=25"></script>
+<script type="module" src="ui.js?v=26"></script>

@@ -223,6 +223,9 @@ export const SCORER_CALIBRATION = Object.freeze({
   "second_harmonic_weight": 0.65,
   "second_harmonic_offset_hours": 0.5,
   "sleep_intensity_exponent": 0.5,
+  "sleep_propensity_floor": 0.55,
+  "body_night_start_hour": 22.0,
+  "body_night_end_hour": 8.0,
   "inertia_minutes": 20.0,
   "inertia_minutes_from_wocl": 30.0,
   "inertia_penalty_points": 9.0
