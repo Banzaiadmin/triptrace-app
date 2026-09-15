@@ -11,9 +11,9 @@
  * `inputs.workload` of every golden.
  */
 
-import { NEAR_FLOOR_MARGIN_HOURS, WORKLOAD } from "./constants.js?v=29";
-import { deepCopy, hmFromHours, pyRound } from "./py.js?v=29";
-import { fmtLocal, fmtUtc, parseUtc } from "./tz.js?v=29";
+import { NEAR_FLOOR_MARGIN_HOURS, WORKLOAD } from "./constants.js?v=30";
+import { deepCopy, hmFromHours, pyRound } from "./py.js?v=30";
+import { fmtLocal, fmtUtc, parseUtc } from "./tz.js?v=30";
 
 const MINUTE = 60_000;
 

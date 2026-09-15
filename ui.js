@@ -12,9 +12,9 @@
  * Where the pilot is right now is shown by position on the chart, not by a made-up percentage.
  */
 
-import { traceModel, renderTrace, sparkline, bandFor, bandColor, bandVar, EFF_THRESHOLD } from "./trace.js?v=29";
+import { traceModel, renderTrace, sparkline, bandFor, bandColor, bandVar, EFF_THRESHOLD } from "./trace.js?v=30";
 
-const V = "29";
+const V = "30";
 const $ = (id) => document.getElementById(id);
 const LAST_KEY = "triptrace.last";
 const REVISIONS_KEY = "triptrace.revisions";
@@ -1387,6 +1387,11 @@ function restore() {
 
 $("open-menu").addEventListener("click", () => openSheet("menu-sheet"));
 $("trip-pill").addEventListener("click", () => openSheet("menu-sheet"));
+// The packaged desktop app ships one layout, so the link to the old one would be a dead end.
+if (window.triptraceDesktop) {
+  document.querySelector('a[href="classic.html"]')?.remove();
+}
+
 $("menu-new").addEventListener("click", () => { closeSheet("menu-sheet"); setSource("sample"); openSheet("import-sheet"); requestAnimationFrame(moveSegIndicator); });
 $("ocr-open").addEventListener("click", () => { $("menu-transcript").click(); });
 $("ocr-dismiss").addEventListener("click", () => { $("ocr-note").hidden = true; });
