@@ -12,9 +12,9 @@
  * Where the pilot is right now is shown by position on the chart, not by a made-up percentage.
  */
 
-import { traceModel, renderTrace, sparkline, bandFor, bandColor, bandVar, EFF_THRESHOLD } from "./trace.js?v=27";
+import { traceModel, renderTrace, sparkline, bandFor, bandColor, bandVar, EFF_THRESHOLD } from "./trace.js?v=28";
 
-const V = "27";
+const V = "28";
 const $ = (id) => document.getElementById(id);
 const LAST_KEY = "triptrace.last";
 const REVISIONS_KEY = "triptrace.revisions";
@@ -94,9 +94,13 @@ const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").mat
  * that arrives over half a second reads as measured, where one that snaps in reads as printed.
  */
 function countTo(node, to, { decimals = 0, duration = 900, suffix = "" } = {}) {
-  if (reduceMotion) { node.textContent = to.toFixed(decimals) + suffix; return; }
-  const start = performance.now();
   const final = to.toFixed(decimals) + suffix;
+  // The true value goes in first, unconditionally. The count-up is a flourish layered on top,
+  // and it only runs when the page is visible: in a hidden tab neither animation frames nor
+  // timers are reliable, and a report that opens behind another window must already be right.
+  node.textContent = final;
+  if (reduceMotion || document.visibilityState !== "visible") return;
+  const start = performance.now();
   let done = false;
   const step = (now) => {
     if (done) return;
