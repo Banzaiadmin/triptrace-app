@@ -25,13 +25,13 @@ import {
   SLEEP_OPPORTUNITY_SUBTRACTIONS,
   SCORER_CALIBRATION as CAL,
   WORKLOAD,
-} from "./constants.js?v=26";
-import { deepCopy, hmFromHours, minBy, pyFloatStr, pyFmt, pyRound } from "./py.js?v=26";
-import { fmtUtc, parseUtc } from "./tz.js?v=26";
+} from "./constants.js?v=27";
+import { deepCopy, hmFromHours, minBy, pyFloatStr, pyFmt, pyRound } from "./py.js?v=27";
+import { fmtUtc, parseUtc } from "./tz.js?v=27";
 
 // Re-exported for the browser harness and older importers.
-export { pyRound } from "./py.js?v=26";
-export { fmtUtc, parseUtc } from "./tz.js?v=26";
+export { pyRound } from "./py.js?v=27";
+export { fmtUtc, parseUtc } from "./tz.js?v=27";
 
 export class ScoringError extends Error {}
 

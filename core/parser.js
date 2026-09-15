@@ -31,8 +31,8 @@ import {
   REPORT_ALLOWANCE_HOURS,
   SLEEP_OPPORTUNITY_SUBTRACTIONS,
   STATIONS,
-} from "./constants.js?v=26";
-import { deepCopy, hmFromMinutes, pyFmt, pyRepr, pyRound, splitLines, uniqueInOrder } from "./py.js?v=26";
+} from "./constants.js?v=27";
+import { deepCopy, hmFromMinutes, pyFmt, pyRepr, pyRound, splitLines, uniqueInOrder } from "./py.js?v=27";
 import {
   HOUR,
   MINUTE,
@@ -43,7 +43,7 @@ import {
   localParts,
   localToUtc,
   utcOffsetMinutes,
-} from "./tz.js?v=26";
+} from "./tz.js?v=27";
 
 /** Raised only when the text contains no recognizable Trip Board rows at all. */
 export class ParseError extends Error {}

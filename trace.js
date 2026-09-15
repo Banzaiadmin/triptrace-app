@@ -13,7 +13,7 @@
  * ever printed, and every figure the app displays comes from the engine.
  */
 
-import { MODEL_PARAMS } from "./core/constants.js?v=26";
+import { MODEL_PARAMS } from "./core/constants.js?v=27";
 
 const HOUR = 3600e3;
 
@@ -60,7 +60,7 @@ export function traceModel(trace) {
       to: l.arr_station ?? "",
       dep: ms(l.dep?.utc),
       arr: ms(l.arr?.utc),
-      deadhead: /^DH/i.test(l.position ?? "") || /deadhead/i.test(l.position ?? ""),
+      deadhead: l.raw?.deadhead === true || /^(CML|DHD|DH)$/i.test(l.flight ?? ""),
       startPct: l.effectiveness?.start_pct ?? null,
       minPct: l.effectiveness?.min_pct ?? null,
       endPct: l.effectiveness?.end_pct ?? null,

@@ -12,9 +12,9 @@
  * Where the pilot is right now is shown by position on the chart, not by a made-up percentage.
  */
 
-import { traceModel, renderTrace, sparkline, bandFor, bandColor, bandVar, EFF_THRESHOLD } from "./trace.js?v=26";
+import { traceModel, renderTrace, sparkline, bandFor, bandColor, bandVar, EFF_THRESHOLD } from "./trace.js?v=27";
 
-const V = "26";
+const V = "27";
 const $ = (id) => document.getElementById(id);
 const LAST_KEY = "triptrace.last";
 const REVISIONS_KEY = "triptrace.revisions";
@@ -96,13 +96,19 @@ const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").mat
 function countTo(node, to, { decimals = 0, duration = 900, suffix = "" } = {}) {
   if (reduceMotion) { node.textContent = to.toFixed(decimals) + suffix; return; }
   const start = performance.now();
+  const final = to.toFixed(decimals) + suffix;
+  let done = false;
   const step = (now) => {
+    if (done) return;
     const t = Math.min(1, (now - start) / duration);
     const eased = 1 - Math.pow(1 - t, 3);
     node.textContent = (to * eased).toFixed(decimals) + suffix;
-    if (t < 1) requestAnimationFrame(step);
+    if (t < 1) requestAnimationFrame(step); else done = true;
   };
   requestAnimationFrame(step);
+  // Animation frames pause in a background tab, and a page that opens behind another window
+  // must not sit on "0%" until it is looked at. The timer lands the final value regardless.
+  setTimeout(() => { if (!done) { done = true; node.textContent = final; } }, duration + 250);
 }
 
 // ── Formatting ──────────────────────────────────────────────────────────────
@@ -374,8 +380,9 @@ function renderExposure(t) {
   const duties = t.duty_periods ?? [];
   const block = p.total_block_hours ?? 0;
   const duty = duties.reduce((a, d) => a + ((d.scheduled_duty?.actual_hours ?? d.scheduled_duty?.scheduled_hours) ?? 0), 0);
+  // The parser records a deadhead in the leg's raw block; the Pos column is the pilot's seat.
   const deadhead = duties.flatMap((d) => d.legs ?? [])
-    .filter((l) => /^DH|deadhead/i.test(l.position ?? "") || l.is_deadhead)
+    .filter((l) => l.raw?.deadhead === true || /^(CML|DHD|DH)$/i.test(l.flight ?? ""))
     .reduce((a, l) => a + ((Date.parse(l.arr?.utc) - Date.parse(l.dep?.utc)) / 3600e3 || 0), 0);
   const nights = duties.filter((d) => {
     const w = d.circadian?.wocl_window;
