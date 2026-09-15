@@ -13,7 +13,7 @@
  * ever printed, and every figure the app displays comes from the engine.
  */
 
-import { MODEL_PARAMS } from "./core/constants.js?v=28";
+import { MODEL_PARAMS } from "./core/constants.js?v=29";
 
 const HOUR = 3600e3;
 

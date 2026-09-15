@@ -16,11 +16,11 @@ const $ = (id) => document.getElementById(id);
 const LAST_KEY = "triptrace.last";
 const INSTALL_DISMISSED_KEY = "triptrace.install-dismissed";
 // Bump together with ASSET_VERSION in sw.js and the ?v= in index.html.
-const V = "28";
+const V = "29";
 
 // The on-device engine, loaded lazily so a browser that cannot run it still has the service path.
 let engine = null;
-const engineReady = import("./core/engine.js?v=28")
+const engineReady = import("./core/engine.js?v=29")
   .then((module) => { engine = module; })
   .catch((error) => { console.warn("on-device engine unavailable; using the service", error); });
 
@@ -690,7 +690,7 @@ $("safety-open").addEventListener("click", () => {
 
 let summaryModule = null;
 async function currentSummary() {
-  summaryModule = summaryModule || await import("./core/summary.js?v=28");
+  summaryModule = summaryModule || await import("./core/summary.js?v=29");
   return summaryModule.summaryModel(state.payload, {
     factors: [...state.factors],
     rescheduled: [...state.resched],
@@ -891,7 +891,7 @@ $("summary-print").addEventListener("click", () => {
 });
 
 $("summary-copy").addEventListener("click", async () => {
-  summaryModule = summaryModule || await import("./core/summary.js?v=28");
+  summaryModule = summaryModule || await import("./core/summary.js?v=29");
   copyText(summaryModule.summaryText(await currentSummary()), $("summary-status"), "Copied as text.");
 });
 for (const sheet of document.querySelectorAll(".sheet-bg")) {

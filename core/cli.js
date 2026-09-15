@@ -11,7 +11,7 @@
  * Run from the repository root. tools/check_port.py finds a runtime and does exactly this.
  */
 
-import { runDifferential, short } from "./differential.js?v=28";
+import { runDifferential, short } from "./differential.js?v=29";
 
 const host = await (async () => {
   if (typeof readFile === "function" && typeof print === "function") {

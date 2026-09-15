@@ -12,9 +12,9 @@
  * Where the pilot is right now is shown by position on the chart, not by a made-up percentage.
  */
 
-import { traceModel, renderTrace, sparkline, bandFor, bandColor, bandVar, EFF_THRESHOLD } from "./trace.js?v=28";
+import { traceModel, renderTrace, sparkline, bandFor, bandColor, bandVar, EFF_THRESHOLD } from "./trace.js?v=29";
 
-const V = "28";
+const V = "29";
 const $ = (id) => document.getElementById(id);
 const LAST_KEY = "triptrace.last";
 const REVISIONS_KEY = "triptrace.revisions";
@@ -419,18 +419,21 @@ function drawRing(value, band) {
         stroke-linecap="round" fill="none" transform="rotate(-90 108 108)"
         stroke-dasharray="${C.toFixed(1)}" stroke-dashoffset="${(reduceMotion ? C * (1 - fill) : C).toFixed(1)}"/>
       <text class="ring-num" x="108" y="104" text-anchor="middle" fill="var(--ink)" stroke="none"
-        ><tspan id="ring-val">${reduceMotion ? pct(value).replace("%", "") : "0"}</tspan><tspan class="unit">%</tspan></text>
+        ><tspan id="ring-val">${pct(value).replace("%", "")}</tspan><tspan class="unit">%</tspan></text>
       <text class="ring-band" x="108" y="130" text-anchor="middle" fill="${color}" stroke="none"
         >${esc(band.label)}</text>
     </svg>`;
+  // The markup above already carries the true number. The sweep and the count-up are flourishes:
+  // the count-up is started synchronously (it decides for itself whether the page is visible),
+  // and only the arc's transition waits for a frame. Nothing about the value depends on a frame.
   if (!reduceMotion) {
     const shown = pct(value);
     const decimals = shown.includes(".") ? 1 : 0;
+    const val = $("ring-val");
+    if (val) countTo(val, value, { decimals, duration: 1150 });
     requestAnimationFrame(() => {
       const arc = $("ring-arc");
       if (arc) arc.style.strokeDashoffset = String(C * (1 - fill));
-      const val = $("ring-val");
-      if (val) countTo(val, value, { decimals, duration: 1150 });
     });
   }
 }
