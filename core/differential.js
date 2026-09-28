@@ -6,15 +6,16 @@
  * reference: a difference means the port is wrong, never the golden.
  */
 
-import { parseTripBoard } from "./parser.js?v=30";
-import { scoreTrace } from "./scorer.js?v=30";
-import { buildReport } from "./report.js?v=30";
-import { applyRevisions, workloadPoints } from "./revisions.js?v=30";
-import { pyRound, pyFmt, pyRepr, pyFloatStr } from "./py.js?v=30";
-import { fmtLocal, fmtUtc, localToUtc, parseUtc, utcOffsetMinutes, localParts } from "./tz.js?v=30";
+import { parseTripBoard } from "./parser.js?v=31";
+import { scoreTrace } from "./scorer.js?v=31";
+import { buildReport } from "./report.js?v=31";
+import { applyRevisions, workloadPoints } from "./revisions.js?v=31";
+import { pyRound, pyFmt, pyRepr, pyFloatStr } from "./py.js?v=31";
+import { readSleepPhrase } from "./sleep-language.js?v=31";
+import { fmtLocal, fmtUtc, localToUtc, parseUtc, utcOffsetMinutes, localParts } from "./tz.js?v=31";
 import {
   WearableError, coverageSummary, detectAndNormalize, importSleep, matchToRestPeriods, toActualSleep,
-} from "./wearables.js?v=30";
+} from "./wearables.js?v=31";
 
 /**
  * Floats round-trip through two languages' math libraries; the last bit can differ. Anything the
@@ -101,6 +102,29 @@ export async function runDifferential({ readText, readJson }) {
     const bad = vectors.filter((v) => pyRound(v.value, v.digits) !== v.expected)
       .map((v) => ({ path: `round(${v.value}, ${v.digits})`, expected: v.expected, actual: pyRound(v.value, v.digits) }));
     record("pyRound vs Python round()", bad, vectors.length);
+  }
+  {
+    // Two implementations of the same grammar. A pilot types free text, and the phone and the
+    // server disagreeing about how much someone slept is not a rounding difference.
+    const vectors = await readJson("goldens/sleep_language_vectors.json");
+    const bad = [];
+    for (const v of vectors) {
+      const actual = readSleepPhrase(v.phrase);
+      if (v.expected === null) {
+        if (actual !== null) bad.push({ path: `read(${JSON.stringify(v.phrase)})`, expected: null, actual });
+        continue;
+      }
+      if (actual === null) {
+        bad.push({ path: `read(${JSON.stringify(v.phrase)})`, expected: v.expected, actual: null });
+        continue;
+      }
+      for (const key of Object.keys(v.expected)) {
+        if (actual[key] !== v.expected[key]) {
+          bad.push({ path: `read(${JSON.stringify(v.phrase)}).${key}`, expected: v.expected[key], actual: actual[key] });
+        }
+      }
+    }
+    record("sleep language vs Python", bad, vectors.length);
   }
   {
     const vectors = await readJson("goldens/format_vectors.json");

@@ -21,17 +21,18 @@
 
 import {
   MODEL_PARAMS,
+  COMMUTE_SLEEP_LOST_HOURS,
   EFFECTIVENESS_BANDS,
   SLEEP_OPPORTUNITY_SUBTRACTIONS,
   SCORER_CALIBRATION as CAL,
   WORKLOAD,
-} from "./constants.js?v=30";
-import { deepCopy, hmFromHours, minBy, pyFloatStr, pyFmt, pyRound } from "./py.js?v=30";
-import { fmtUtc, parseUtc } from "./tz.js?v=30";
+} from "./constants.js?v=31";
+import { deepCopy, hmFromHours, minBy, pyFloatStr, pyFmt, pyRound } from "./py.js?v=31";
+import { fmtUtc, parseUtc } from "./tz.js?v=31";
 
 // Re-exported for the browser harness and older importers.
-export { pyRound } from "./py.js?v=30";
-export { fmtUtc, parseUtc } from "./tz.js?v=30";
+export { pyRound } from "./py.js?v=31";
+export { fmtUtc, parseUtc } from "./tz.js?v=31";
 
 export class ScoringError extends Error {}
 
@@ -44,8 +45,13 @@ const SPLIT_SLEEP_THRESHOLD_HOURS = 5.0;
 // See scorer.py: a layover containing several body-clock nights is slept in several nights.
 const MIN_WAKE_BETWEEN_SLEEPS_HOURS = 12.0;
 const MAX_SLEEP_BLOCKS_PER_REST = 8;
-const PRE_TRIP_SLEEP_HOURS = 7.5;
+const PRE_TRIP_SLEEP_HOURS = CAL.pre_trip_sleep_hours;
 const PRE_TRIP_LEAD_HOURS = 48;
+// See scorer.py: the trip used to start behind a phantom wake period of up to 38 hours, whose size
+// was an accident of where report time fell against a fixed window boundary. These remove it.
+const PRE_TRIP_SETTLE_NIGHTS = CAL.pre_trip_settle_nights;
+const PRIOR_HISTORY_MAX_NIGHTS = CAL.prior_history_max_nights;
+const PRIOR_BURN_IN_NIGHTS = CAL.prior_burn_in_nights;
 const BODY_NIGHT_START_HOUR = 22.0;
 const BODY_NIGHT_END_HOUR = 8.0;
 
@@ -134,6 +140,12 @@ class BodyClock {
 
   hour(when) {
     const shifted = new Date(when + (this.baseOffset + this.driftAt(when)) * HOUR);
+    return shifted.getUTCHours() + shifted.getUTCMinutes() / 60 + shifted.getUTCSeconds() / 3600;
+  }
+
+  /** Domicile hour with no drift applied. See scorer.py `_apply_drift` for why this exists. */
+  undriftedHour(when) {
+    const shifted = new Date(when + this.baseOffset * HOUR);
     return shifted.getUTCHours() + shifted.getUTCMinutes() / 60 + shifted.getUTCSeconds() / 3600;
   }
 
@@ -262,14 +274,77 @@ function resolveOverlaps(sleeps) {
   return resolved;
 }
 
-function buildSleepPlan(trace, duties, clock, tripStart) {
+/**
+ * The nights before duty day 1, reported ones overriding assumed ones. Mirrors
+ * `scorer._plan_prior_nights` — read its docstring, which carries the reasoning.
+ *
+ * @returns {{blocks: PlannedSleep[], commuteApplied: boolean}}
+ */
+function planPriorNights(priorSleep, nightEnd, commute) {
+  const lost = COMMUTE_SLEEP_LOST_HOURS[commute ?? ""] ?? 0.0;
+  const defaultEfficiency = MODEL_PARAMS.nocturnal_sleep_efficiency;
+
+  const defaultNight = (index) => {
+    const end = nightEnd - (index - 1) * 24 * HOUR;
+    const hours = PRE_TRIP_SLEEP_HOURS - (index === 1 ? lost : 0.0);
+    if (hours < MIN_SLEEP_BLOCK_HOURS) return null;
+    return new PlannedSleep(end - hours * HOUR, end, "pre_trip", defaultEfficiency);
+  };
+
+  const reported = [];
+  const covered = new Set();
+  let deepest = 1;
+
+  for (const entry of priorSleep ?? []) {
+    if (!entry || typeof entry !== "object") continue;
+    const efficiency = entry.efficiency === undefined || entry.efficiency === null
+      ? defaultEfficiency : Number(entry.efficiency);
+
+    let start;
+    let end;
+    let index;
+    if (entry.start_utc && entry.end_utc) {
+      start = parseUtc(entry.start_utc);
+      end = parseUtc(entry.end_utc);
+      if (!Number.isFinite(start) || !Number.isFinite(end)) continue;
+      if (end <= start || start >= nightEnd) continue;
+      index = Math.floor(hoursBetween(end, nightEnd) / 24) + 1;
+    } else {
+      index = Number.parseInt(entry.nights_before, 10);
+      const hours = Number(entry.hours);
+      if (!Number.isFinite(index) || !Number.isFinite(hours) || hours < 0) continue;
+      end = nightEnd - (index - 1) * 24 * HOUR;
+      start = end - hours * HOUR;
+    }
+
+    if (!(index >= 1 && index <= PRIOR_HISTORY_MAX_NIGHTS)) continue;
+    deepest = Math.max(deepest, index);
+    covered.add(index);
+    if (hoursBetween(start, end) >= MIN_SLEEP_BLOCK_HOURS) {
+      reported.push(new PlannedSleep(start, end, "pre_trip", efficiency, "actual"));
+    }
+  }
+
+  const blocks = [...reported];
+  const depth = covered.size
+    ? Math.max(PRE_TRIP_SETTLE_NIGHTS, deepest + PRIOR_BURN_IN_NIGHTS)
+    : PRE_TRIP_SETTLE_NIGHTS;
+  for (let index = 1; index <= depth; index += 1) {
+    if (covered.has(index)) continue;
+    const filled = defaultNight(index);
+    if (filled !== null) blocks.push(filled);
+  }
+
+  blocks.sort((a, b) => a.start - b.start);
+  return { blocks, commuteApplied: Boolean(lost) && !covered.has(1) };
+}
+
+function buildSleepPlan(trace, duties, clock, tripStart, priorSleep, commute) {
   const sleeps = [];
 
   const nightEnd = bodyTimeBefore(tripStart, BODY_NIGHT_END_HOUR, clock);
-  sleeps.push(new PlannedSleep(
-    nightEnd - PRE_TRIP_SLEEP_HOURS * HOUR, nightEnd, "pre_trip",
-    MODEL_PARAMS.nocturnal_sleep_efficiency,
-  ));
+  const prior = planPriorNights(priorSleep, nightEnd, commute);
+  sleeps.push(...prior.blocks);
 
   if (hoursBetween(nightEnd, tripStart) > 12) {
     const napEnd = tripStart - 1.5 * HOUR;
@@ -308,7 +383,7 @@ function buildSleepPlan(trace, duties, clock, tripStart) {
   }
 
   sleeps.sort((a, b) => a.start - b.start);
-  return resolveOverlaps(sleeps);
+  return { sleeps: resolveOverlaps(sleeps), commuteApplied: prior.commuteApplied };
 }
 
 function applyActuals(sleeps, actuals, trace) {
@@ -380,7 +455,7 @@ function applyDrift(clock, sleeps) {
   for (const planned of sleeps) {
     if (!["anchor", "hotel_core", "pre_trip"].includes(planned.kind) || planned.hours < 3) continue;
     const midpoint = planned.start + (planned.end - planned.start) / 2;
-    let target = clock.hour(midpoint) - 3;
+    let target = clock.undriftedHour(midpoint) - 3;
     if (target > 12) target -= 24;
     else if (target < -12) target += 24;
 
@@ -550,7 +625,7 @@ function writeRestPeriods(trace, sleeps, clock) {
 
 // ── Trip-level outputs ──────────────────────────────────────────────────────
 
-function writeOutputs(trace, duties, clock, usedActuals) {
+function writeOutputs(trace, duties, clock, usedActuals, history = {}) {
   const scored = duties.filter((d) => d.effectiveness);
   if (!scored.length) throw new ScoringError("No duty period could be scored.");
 
@@ -591,7 +666,7 @@ function writeOutputs(trace, duties, clock, usedActuals) {
     threshold_crossings: crossings,
     risk_label: `D${worstDuty.day_index} ${worstBlock.min_location}`,
     transparency: {
-      sleep_assumptions: sleepAssumptions(usedActuals),
+      sleep_assumptions: sleepAssumptions(usedActuals, history),
       circadian_anchors: circadianSummary(duties, clock),
       confidence_by_day: Object.fromEntries(
         duties.map((d) => [String(d.day_index), "confidence" in d ? d.confidence : "medium"]),
@@ -652,8 +727,27 @@ function drivers(trace, duty, block, minOnDeadhead, worstAny) {
   return parts.join(" ");
 }
 
-function sleepAssumptions(usedActuals) {
+function sleepAssumptions(usedActuals, history = {}) {
   const s = SLEEP_OPPORTUNITY_SUBTRACTIONS;
+  const priorNights = history.priorNights ?? 0;
+  let historyText;
+  if (priorNights) {
+    historyText = ` ${priorNights} night(s) before the trip were reported and carried into the ` +
+      `starting reservoir; any unreported night inside that span was assumed to be a normal ` +
+      `${pyFmt(PRE_TRIP_SLEEP_HOURS, 1)} h night.`;
+  } else {
+    historyText = ` No sleep before the trip was reported, so the ${PRE_TRIP_SETTLE_NIGHTS} nights ` +
+      `before it were assumed normal at ${pyFmt(PRE_TRIP_SLEEP_HOURS, 1)} h each. ` +
+      "A pilot arriving already in debt will read better here than they are — report the " +
+      "nights to fix that.";
+  }
+  const lost = COMMUTE_SLEEP_LOST_HOURS[history.commute ?? ""] ?? 0.0;
+  if (lost && history.commuteApplied) {
+    historyText += ` The reported commute to base removed ${pyFmt(lost, 1)} h from the night before day 1.`;
+  } else if (lost) {
+    historyText += " A commute was reported, but night 1 was reported directly, so whatever the " +
+      "commute cost is already inside the sleep you entered.";
+  }
   return `Sleep opportunity = printed layover minus transport ${pyFmt(s.transport_hours, 2)} h, ` +
     `wind-down ${pyFmt(s.wind_down_hours, 2)} h, meal ${pyFmt(s.meal_hours, 2)} h, and pre-report prep ` +
     `${pyFmt(s.pre_report_prep_hours, 2)} h. Daytime efficiency ${pyFmt(MODEL_PARAMS.daytime_sleep_efficiency, 2)}, ` +
@@ -662,7 +756,7 @@ function sleepAssumptions(usedActuals) {
     `waking (${pyFmt(CAL.inertia_minutes_from_wocl, 0)} min from a WOCL wake). ` +
     (usedActuals
       ? `${usedActuals} pilot-reported or wearable sleep period(s) overrode the model.`
-      : "No actuals supplied — every sleep block is modeled.");
+      : "No actuals supplied — every sleep block is modeled.") + historyText;
 }
 
 function circadianSummary(duties, clock) {
@@ -696,7 +790,9 @@ export function scoreTrace(input, options = {}) {
   const tripStart = parseUtc(duties[0].report.utc);
   const tripEnd = parseUtc(duties[duties.length - 1].release.utc);
 
-  let sleeps = buildSleepPlan(trace, duties, clock, tripStart);
+  const plan = buildSleepPlan(trace, duties, clock, tripStart,
+                              options.priorSleep ?? null, options.commute ?? null);
+  let sleeps = plan.sleeps;
   const applied = applyActuals(sleeps, options.actualSleep ?? [], trace);
   sleeps = applied.sleeps;
 
@@ -709,7 +805,11 @@ export function scoreTrace(input, options = {}) {
   annotate(trace, duties, samples, clock);
   applyWorkload(duties, workload);
   writeRestPeriods(trace, sleeps, clock);
-  writeOutputs(trace, duties, clock, applied.used);
+  writeOutputs(trace, duties, clock, applied.used, {
+    priorNights: sleeps.filter((s) => s.kind === "pre_trip" && s.source === "actual").length,
+    commute: options.commute ?? null,
+    commuteApplied: plan.commuteApplied,
+  });
   return trace;
 }
 

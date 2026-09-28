@@ -228,7 +228,191 @@ export const SCORER_CALIBRATION = Object.freeze({
   "body_night_end_hour": 8.0,
   "inertia_minutes": 20.0,
   "inertia_minutes_from_wocl": 30.0,
-  "inertia_penalty_points": 9.0
+  "inertia_penalty_points": 9.0,
+  "pre_trip_sleep_hours": 7.5,
+  "pre_trip_settle_nights": 6,
+  "prior_history_max_nights": 7,
+  "prior_burn_in_nights": 1
+});
+
+/** Sleep a commute to base costs, by how the pilot travelled (scorer.py). */
+export const COMMUTE_SLEEP_LOST_HOURS = Object.freeze({
+  "based": 0.0,
+  "short": 0.0,
+  "long": 1.5,
+  "night": 4.5
+});
+
+/** Plain-language sleep reading, owned by sleep_language.py — this model's calibration. */
+export const SLEEP_LANGUAGE = Object.freeze({
+  "quality_words": {
+    "no sleep": [
+      0.0,
+      0.0
+    ],
+    "none": [
+      0.0,
+      0.0
+    ],
+    "did not sleep": [
+      0.0,
+      0.0
+    ],
+    "didnt sleep": [
+      0.0,
+      0.0
+    ],
+    "never slept": [
+      0.0,
+      0.0
+    ],
+    "barely": [
+      2.5,
+      0.6
+    ],
+    "hardly": [
+      2.5,
+      0.6
+    ],
+    "terrible": [
+      3.5,
+      0.62
+    ],
+    "awful": [
+      3.5,
+      0.62
+    ],
+    "horrible": [
+      3.5,
+      0.62
+    ],
+    "very bad": [
+      3.5,
+      0.62
+    ],
+    "bad": [
+      5.0,
+      0.75
+    ],
+    "poor": [
+      5.0,
+      0.75
+    ],
+    "rough": [
+      5.0,
+      0.75
+    ],
+    "not good": [
+      5.0,
+      0.75
+    ],
+    "light": [
+      6.0,
+      0.78
+    ],
+    "not great": [
+      6.0,
+      0.82
+    ],
+    "so so": [
+      6.0,
+      0.82
+    ],
+    "mediocre": [
+      6.0,
+      0.82
+    ],
+    "average": [
+      7.0,
+      0.9
+    ],
+    "normal": [
+      7.0,
+      0.9
+    ],
+    "ok": [
+      7.0,
+      0.9
+    ],
+    "okay": [
+      7.0,
+      0.9
+    ],
+    "fine": [
+      7.0,
+      0.9
+    ],
+    "decent": [
+      7.0,
+      0.9
+    ],
+    "good": [
+      7.5,
+      0.93
+    ],
+    "well": [
+      7.5,
+      0.93
+    ],
+    "great": [
+      8.0,
+      0.95
+    ],
+    "solid": [
+      8.0,
+      0.95
+    ],
+    "excellent": [
+      8.0,
+      0.95
+    ]
+  },
+  "fragmentation_words": [
+    "broken",
+    "restless",
+    "fragmented",
+    "interrupted",
+    "in and out",
+    "kept waking",
+    "woke up a lot",
+    "woke a lot",
+    "tossed",
+    "tossing"
+  ],
+  "fragmentation_efficiency": 0.65,
+  "hedge_words": [
+    "about",
+    "roughly",
+    "around",
+    "maybe",
+    "approximately",
+    "or so",
+    "~",
+    "ish"
+  ],
+  "max_credible_sleep_hours": 14.0,
+  "word_numbers": {
+    "zero": 0,
+    "one": 1,
+    "two": 2,
+    "three": 3,
+    "four": 4,
+    "five": 5,
+    "six": 6,
+    "seven": 7,
+    "eight": 8,
+    "nine": 9,
+    "ten": 10,
+    "eleven": 11,
+    "twelve": 12
+  },
+  "vague_counts": {
+    "a couple of": 2,
+    "a couple": 2,
+    "a few": 3
+  },
+  "assumed_efficiency_from_interval": 0.88,
+  "nocturnal_sleep_efficiency": 0.95
 });
 
 /** Parser-local constant: how close to the floor counts as 'near'. */
@@ -241,10 +425,16 @@ export const WORKLOAD = Object.freeze({
     "MEL / swap": 15,
     "ATC delays": 15,
     "Extended duty": 15,
+    "APU inop": 15,
+    "Diversion / go-around": 15,
+    "De-ice": 10,
+    "Heat or cold": 10,
+    "Turbulence": 10,
     "Sort delay": 10,
     "Reduced rest": 10,
     "Hotel disruption": 10,
-    "Long commute": 10
+    "Long commute": 10,
+    "Unfamiliar airport": 5
   },
   "default_points": 10,
   "delay_points_per_30_min": 5,

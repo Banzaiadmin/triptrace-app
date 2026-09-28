@@ -20,7 +20,7 @@
 <title>TripTrace</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-192.png">
-<link rel="stylesheet" href="ui.css?v=30">
+<link rel="stylesheet" href="ui.css?v=31">
 
 <div class="app" id="app">
 
@@ -228,6 +228,12 @@
           show. A long drive or a positioning flight the day before starts the trip in a hole.</p>
         <label class="sub small">Getting to base for duty day 1</label>
         <div class="chips" id="commute-chips" style="margin-top:8px"></div>
+
+        <h4 class="ask-h">How you slept the nights before</h4>
+        <p class="sub small">Say it however you'd say it out loud — <em>about 5 hours</em>,
+          <em>bad</em>, <em>2300 to 0600</em>, <em>7 hours but broken</em>. Leave a night blank and
+          it is assumed normal. Without this, every trip is scored as though you arrived rested.</p>
+        <div id="prior-nights"></div>
       </div>
 
       <p class="sub small err" id="import-error" hidden></p>
@@ -368,4 +374,4 @@
   <p id="working-text">Reading the trip</p>
 </div>
 
-<script type="module" src="ui.js?v=30"></script>
+<script type="module" src="ui.js?v=31"></script>

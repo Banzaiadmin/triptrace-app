@@ -11,11 +11,11 @@
  * and therefore works with no signal.
  */
 
-import { ParseError, parseTripBoard } from "./parser.js?v=30";
-import { ScoringError, scoreTrace } from "./scorer.js?v=30";
-import { buildReport } from "./report.js?v=30";
-import { applyRevisions, normalizeRevisions, workloadPoints } from "./revisions.js?v=30";
-import { WORKLOAD } from "./constants.js?v=30";
+import { ParseError, parseTripBoard } from "./parser.js?v=31";
+import { ScoringError, scoreTrace } from "./scorer.js?v=31";
+import { buildReport } from "./report.js?v=31";
+import { applyRevisions, normalizeRevisions, workloadPoints } from "./revisions.js?v=31";
+import { WORKLOAD } from "./constants.js?v=31";
 import {
   VENDORS,
   WearableError,
@@ -24,7 +24,7 @@ import {
   importSleep as normalizeSleepPayload,
   matchToRestPeriods,
   toActualSleep,
-} from "./wearables.js?v=30";
+} from "./wearables.js?v=31";
 
 export const ENGINE = "device";
 export const WEARABLE_VENDORS = VENDORS;
@@ -43,6 +43,9 @@ export const CARRIERS = Object.freeze([
 
 /** A user-facing failure. `message` is written to be shown as-is. */
 export class EngineError extends Error {}
+
+/** Re-exported so the shell can echo back what a typed phrase was understood to mean. */
+export { readSleepPhrase } from "./sleep-language.js?v=31";
 
 export function requireSupportedCarrier(carrier) {
   const id = (carrier || "ups").toLowerCase();
@@ -69,6 +72,8 @@ export function analyzeText(text, {
   domicile = null,
   domicileTz = null,
   stationTzOverrides = null,
+  priorSleep = null,
+  commute = null,
 } = {}) {
   requireSupportedCarrier(carrier);
 
@@ -108,6 +113,8 @@ export function analyzeText(text, {
     trace = scoreTrace(trace, {
       actualSleep: sessions.length ? toActualSleep(sessions) : null,
       workload: Object.keys(workload).length ? workload : null,
+      priorSleep,
+      commute,
     });
     scored = true;
   } catch (error) {

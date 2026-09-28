@@ -706,3 +706,25 @@ textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
   .summary td::before { content: none; }
   .summary tr { background: none; padding: 0; margin: 0; }
 }
+
+
+/* ── The nights before the trip ───────────────────────────────────────────
+ * The echo under each field is the point of this control, not a nicety. The pilot types prose and
+ * the app says back exactly what it understood — or says plainly that it could not read it, which
+ * is a real answer here and never a silent guess.
+ */
+.ask-h { margin: 18px 0 4px; font-size: 15px; font-weight: 600; color: var(--ink); }
+.night-row { margin-top: 10px; }
+.night-row > label { display: block; font-size: 12px; color: var(--sub); margin-bottom: 4px; }
+.night-row input {
+  width: 100%; padding: 10px 12px; border-radius: var(--radius); font: inherit; font-size: 15px;
+  background: var(--surface-2); color: var(--ink); border: 1px solid var(--hair);
+  transition: border-color var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out);
+}
+.night-row input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+.night-echo {
+  margin-top: 4px; font-size: 12px; min-height: 1.2em; color: var(--dim);
+  transition: color var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out);
+}
+.night-echo.read { color: var(--band-green); }
+.night-echo.unread { color: var(--band-yellow); }

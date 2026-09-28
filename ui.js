@@ -12,15 +12,24 @@
  * Where the pilot is right now is shown by position on the chart, not by a made-up percentage.
  */
 
-import { traceModel, renderTrace, sparkline, bandFor, bandColor, bandVar, EFF_THRESHOLD } from "./trace.js?v=30";
+import { traceModel, renderTrace, sparkline, bandFor, bandColor, bandVar, EFF_THRESHOLD } from "./trace.js?v=31";
 
-const V = "30";
+const V = "31";
 const $ = (id) => document.getElementById(id);
 const LAST_KEY = "triptrace.last";
 const REVISIONS_KEY = "triptrace.revisions";
 const THEME_KEY = "triptrace.theme";
 const TZ_KEY = "triptrace.station-tz";
 const COMMUTE_KEY = "triptrace.commute";
+const NIGHTS_KEY = "triptrace.prior-nights";
+
+/**
+ * The nights before the trip. Without them the model has to assume the pilot arrived rested, and
+ * says so; with them it carries real debt into duty day 1. Three is as far back as recall is worth
+ * more than the assumption it replaces — the scorer accepts seven, and the transparency block
+ * states which path ran either way.
+ */
+const NIGHT_LABELS = ["Last night", "Two nights ago", "Three nights ago"];
 
 /**
  * How the pilot reached base for duty day 1. The Trip Board cannot show it and the parser files it
@@ -78,6 +87,7 @@ const state = {
   localClock: false,
   stationTz: {},        // IATA -> IANA, supplied by the pilot for stations the table lacks
   commute: null,        // null = not asked yet
+  nights: ["", "", ""], // plain language, one per night before the trip
   installPrompt: null,
 };
 
@@ -1159,6 +1169,7 @@ async function rerun() {
     state.payload = engine.analyzeText(transcript, {
       carrier: state.carrier, actualSleep: state.sleep, revisions: revisionsPayload(),
       factors: commuteFactors(),
+      priorSleep: priorSleepPayload(), commute: state.commute,
       stationTzOverrides: Object.keys(state.stationTz).length ? state.stationTz : null,
     });
     state.payload.transcript = transcript;
@@ -1278,6 +1289,7 @@ async function analyzeTranscript(text, carrier, { ocr = false } = {}) {
   const payload = engine.analyzeText(text, {
     carrier, actualSleep: state.sleep, revisions: revisionsPayload(),
     factors: commuteFactors(),
+    priorSleep: priorSleepPayload(), commute: state.commute,
     stationTzOverrides: Object.keys(state.stationTz).length ? state.stationTz : null,
   });
   payload.transcript = text;
@@ -1474,11 +1486,64 @@ function renderCommute() {
   }
 }
 
-/** The only commute answers that move a number do it as workload, like any other condition. */
+/**
+ * A long commute counts twice, in two different terms, and that is not double counting: it costs
+ * SLEEP, which the scorer takes off the night before day 1, and it adds TASK LOAD, which is
+ * workload like any other condition. The spec's Combined Capacity metric keeps them apart.
+ */
 const commuteFactors = () => {
   const choice = COMMUTE_CHOICES.find((c) => c.id === state.commute);
   return choice?.factor ? ["Long commute"] : [];
 };
+
+/** Read every night the pilot typed. Anything unreadable is simply left out — never guessed. */
+function priorSleepPayload() {
+  if (!engine?.readSleepPhrase) return [];
+  const out = [];
+  state.nights.forEach((text, index) => {
+    const reading = engine.readSleepPhrase(text);
+    if (reading) {
+      out.push({ nights_before: index + 1, hours: reading.hours, efficiency: reading.efficiency });
+    }
+  });
+  return out;
+}
+
+function renderNights() {
+  $("prior-nights").innerHTML = NIGHT_LABELS.map((label, index) => `
+    <div class="night-row">
+      <label for="night-${index}">${esc(label)}</label>
+      <input id="night-${index}" type="text" autocomplete="off" spellcheck="false"
+        data-n="${index}" value="${esc(state.nights[index] ?? "")}"
+        placeholder="${index === 0 ? "about 5 hours, broken" : "leave blank if normal"}">
+      <div class="night-echo" id="night-echo-${index}" aria-live="polite"></div>
+    </div>`).join("");
+  for (const input of $("prior-nights").querySelectorAll("input")) {
+    input.addEventListener("input", () => {
+      state.nights[Number(input.dataset.n)] = input.value;
+      try { localStorage.setItem(NIGHTS_KEY, JSON.stringify(state.nights)); } catch (_) { /* fine */ }
+      echoNight(Number(input.dataset.n));
+    });
+  }
+  state.nights.forEach((_, index) => echoNight(index));
+}
+
+/** Say back exactly what was understood. An unreadable phrase says so rather than scoring wrong. */
+function echoNight(index) {
+  const node = $(`night-echo-${index}`);
+  if (!node) return;
+  const text = (state.nights[index] ?? "").trim();
+  if (!text) { node.textContent = ""; node.className = "night-echo"; return; }
+  const reading = engine?.readSleepPhrase?.(text) ?? null;
+  if (!reading) {
+    node.textContent = "Couldn’t read that — this night will be assumed normal.";
+    node.className = "night-echo unread";
+    return;
+  }
+  const note = reading.confidence === "low" ? " · a word, not a measurement" : "";
+  node.textContent = `Read as ${reading.interpretation}${note}`;
+  node.className = "night-echo read";
+}
 
 /** Stations the parser could not place, read straight out of what it reported. */
 function unknownStations() {
@@ -1535,7 +1600,12 @@ $("menu-commute").addEventListener("click", async () => {
   restoreRevisions();
   try { state.stationTz = JSON.parse(localStorage.getItem(TZ_KEY) ?? "{}"); } catch (_) { state.stationTz = {}; }
   try { state.commute = localStorage.getItem(COMMUTE_KEY) || null; } catch (_) { state.commute = null; }
+  try {
+    const saved = JSON.parse(localStorage.getItem(NIGHTS_KEY) ?? "[]");
+    if (Array.isArray(saved)) state.nights = NIGHT_LABELS.map((_, i) => String(saved[i] ?? ""));
+  } catch (_) { state.nights = ["", "", ""]; }
   renderCommute();
+  renderNights();
   renderVendors();
   loadSamples();
   await engineReady;
