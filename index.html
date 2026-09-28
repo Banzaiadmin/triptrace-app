@@ -20,7 +20,7 @@
 <title>TripTrace</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-192.png">
-<link rel="stylesheet" href="ui.css?v=32">
+<link rel="stylesheet" href="ui.css?v=33">
 
 <div class="app" id="app">
 
@@ -268,6 +268,46 @@
   </div>
 </div>
 
+<!-- What changed, and how to use it. Content lives in whatsnew.js; ui.js fills this in. -->
+<div class="sheet-bg" id="whatsnew-sheet" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="whatsnew-title">
+    <div class="grabber" aria-hidden="true"></div>
+    <div class="sheet-body">
+      <div class="wn-head">
+        <div class="wn-mark" aria-hidden="true">
+          <svg viewBox="0 0 96 96"><path d="M8 62c14 0 18-34 40-34s26 34 40 34"/></svg>
+        </div>
+        <h2 class="wn-title" id="whatsnew-title">What's New</h2>
+        <p class="wn-sub" id="whatsnew-sub"></p>
+      </div>
+      <div class="wn-list" id="whatsnew-list"></div>
+      <button class="btn btn-primary btn-lg block-btn" id="whatsnew-done"
+        style="margin-top:26px">Continue</button>
+    </div>
+  </div>
+</div>
+
+<!-- The safety assessment, shown rather than offered. Opened automatically after every analysis:
+     a pilot should have read it before deciding whether to download it. -->
+<div class="sheet-bg" id="assessment-sheet" data-deliberate="true" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="assessment-title">
+    <div class="grabber" aria-hidden="true"></div>
+    <div class="sheet-head">
+      <h2 id="assessment-title">Safety assessment</h2>
+      <button class="icon-btn" data-close="assessment-sheet" aria-label="Close">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <div class="sheet-body">
+      <div id="assessment-body"></div>
+      <div class="sheet-actions" style="margin-top:18px">
+        <button class="btn btn-primary" id="assessment-done">I've read this</button>
+        <button class="btn btn-quiet" id="assessment-summary">Save or share it</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="sheet-bg" id="menu-sheet" hidden>
   <div class="sheet sheet-short" role="dialog" aria-modal="true" aria-label="Menu">
     <div class="grabber" aria-hidden="true"></div>
@@ -282,6 +322,7 @@
       <button class="menu-row" id="menu-theme">Switch to light</button>
       <button class="menu-row" id="menu-commute">Change how you got to base</button>
       <button class="menu-row" id="menu-transcript">View or fix the transcript</button>
+      <button class="menu-row" id="menu-whatsnew">What's new, and how to use it</button>
       <button class="menu-row" id="menu-about">What this is, and is not</button>
       <a class="menu-row" href="classic.html" style="display:block;text-decoration:none">Open the previous layout</a>
       <button class="menu-row danger" id="menu-clear">Clear this trip</button>
@@ -374,4 +415,4 @@
   <p id="working-text">Reading the trip</p>
 </div>
 
-<script type="module" src="ui.js?v=32"></script>
+<script type="module" src="ui.js?v=33"></script>

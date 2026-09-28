@@ -9,8 +9,8 @@
  * The tables live in constants.js, generated from Python. Nothing numeric is retyped here.
  */
 
-import { SLEEP_LANGUAGE as L } from "./constants.js?v=32";
-import { pyRound } from "./py.js?v=32";
+import { SLEEP_LANGUAGE as L } from "./constants.js?v=33";
+import { pyRound } from "./py.js?v=33";
 
 const HOUR_UNIT = "(?:h|hr|hrs|hour|hours)";
 

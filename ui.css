@@ -728,3 +728,50 @@ textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 }
 .night-echo.read { color: var(--band-green); }
 .night-echo.unread { color: var(--band-yellow); }
+
+
+/* ── What's New ───────────────────────────────────────────────────────────
+ * The shape Apple uses after an update, for the reason they use it: a list of instructions is
+ * read when it arrives at the moment the thing changed, and ignored when it lives in a help page.
+ */
+.wn-head { text-align: center; padding: 6px 0 2px; }
+.wn-mark { display: flex; justify-content: center; margin-bottom: 14px; }
+.wn-mark svg { width: 64px; height: 64px; color: var(--brand); stroke-width: 6; }
+.wn-title { font-size: 27px; font-weight: 700; letter-spacing: -0.02em; margin: 0 0 8px; }
+.wn-sub { color: var(--sub); font-size: 13.5px; line-height: 1.55; margin: 0 auto 26px;
+  max-width: 34ch; }
+.wn-list { display: grid; gap: 24px; }
+.wn-item { display: grid; grid-template-columns: 28px 1fr; gap: 16px; align-items: start; }
+.wn-item svg { width: 25px; height: 25px; color: var(--accent); margin-top: 1px; }
+.wn-item h3 { margin: 0 0 4px; font-size: 15.5px; font-weight: 600; letter-spacing: -0.01em; }
+.wn-item p { margin: 0; color: var(--sub); font-size: 13.5px; line-height: 1.55; }
+/* The words a pilot would actually type, not emphasis. */
+.wn-item em { color: var(--ink); font-style: normal; font-weight: 500; }
+
+.wn-item { animation: wnIn 520ms var(--ease-out) both; }
+.wn-item:nth-child(1) { animation-delay: 80ms; }
+.wn-item:nth-child(2) { animation-delay: 150ms; }
+.wn-item:nth-child(3) { animation-delay: 220ms; }
+.wn-item:nth-child(4) { animation-delay: 290ms; }
+.wn-item:nth-child(5) { animation-delay: 360ms; }
+.wn-item:nth-child(6) { animation-delay: 430ms; }
+@keyframes wnIn { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+
+/* ── The safety assessment, shown rather than offered ─────────────────────── */
+.as-verdict { display: flex; align-items: baseline; gap: 12px; margin: 0 0 4px; }
+.as-pct { font-size: 40px; font-weight: 700; letter-spacing: -0.03em; line-height: 1; }
+.as-band { font-size: 13px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; }
+.as-where { color: var(--sub); font-size: 13.5px; margin: 0 0 18px; }
+.as-block { margin-top: 18px; }
+.as-block h3 { margin: 0 0 8px; font-size: 12px; font-weight: 600; color: var(--sub);
+  text-transform: uppercase; letter-spacing: 0.06em; }
+.as-text { white-space: pre-wrap; font: inherit; font-size: 13.5px; line-height: 1.6;
+  color: var(--ink); margin: 0; }
+.as-list { margin: 0; padding-left: 18px; }
+.as-list li { color: var(--sub); font-size: 13.5px; line-height: 1.55; margin-bottom: 6px; }
+.as-note { color: var(--dim); font-size: 12px; line-height: 1.55; margin: 18px 0 0;
+  border-top: 1px solid var(--hair); padding-top: 14px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .wn-item { animation: none; }
+}

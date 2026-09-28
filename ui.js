@@ -12,9 +12,10 @@
  * Where the pilot is right now is shown by position on the chart, not by a made-up percentage.
  */
 
-import { traceModel, renderTrace, sparkline, bandFor, bandColor, bandVar, EFF_THRESHOLD } from "./trace.js?v=32";
+import { traceModel, renderTrace, sparkline, bandFor, bandColor, bandVar, EFF_THRESHOLD } from "./trace.js?v=33";
+import { RELEASE, ICONS, NOTES, FIRST_RUN_BLURB, UPDATE_BLURB } from "./whatsnew.js?v=33";
 
-const V = "32";
+const V = "33";
 const $ = (id) => document.getElementById(id);
 const LAST_KEY = "triptrace.last";
 const REVISIONS_KEY = "triptrace.revisions";
@@ -22,6 +23,7 @@ const THEME_KEY = "triptrace.theme";
 const TZ_KEY = "triptrace.station-tz";
 const COMMUTE_KEY = "triptrace.commute";
 const NIGHTS_KEY = "triptrace.prior-nights";
+const SEEN_KEY = "triptrace.seen-release";
 
 /**
  * The nights before the trip. Without them the model has to assume the pilot arrived rested, and
@@ -239,14 +241,21 @@ function makeDraggable(sheet, bgId) {
   sheet.addEventListener("pointerup", end);
   sheet.addEventListener("pointercancel", end);
 }
+// `data-deliberate` marks a sheet that may only be closed on purpose: no drag-to-dismiss, no
+// backdrop tap. The safety assessment uses it. Escape still works, because trapping someone in a
+// dialog to make them read it is how you lose the people navigating by keyboard, and a pilot who
+// wants out will find a way out regardless — the point is that leaving is a decision.
+const deliberate = (bg) => bg.dataset.deliberate === "true";
+
 for (const bg of document.querySelectorAll(".sheet-bg")) {
   const sheet = bg.querySelector(".sheet");
-  if (sheet) makeDraggable(sheet, bg.id);
+  if (sheet && !deliberate(bg)) makeDraggable(sheet, bg.id);
 }
 for (const b of document.querySelectorAll("[data-close]")) {
   b.addEventListener("click", () => closeSheet(b.dataset.close));
 }
 for (const bg of document.querySelectorAll(".sheet-bg")) {
+  if (deliberate(bg)) continue;
   bg.addEventListener("click", (e) => { if (e.target === bg) closeSheet(bg.id); });
 }
 document.addEventListener("keydown", (e) => {
@@ -1301,6 +1310,10 @@ async function analyzeTranscript(text, carrier, { ocr = false } = {}) {
   setTab("trip");
   // A transcript the device read itself deserves a look before the numbers are trusted.
   if (ocr) $("ocr-note").hidden = false;
+  // Shown, not offered — and only on a fresh analysis. Re-running after logging a delay leaves it
+  // closed, because a pilot iterating on "what if we go an hour late" does not need the assessment
+  // thrown at them four times.
+  if (state.payload?.scored) showAssessment();
 }
 
 async function analyzeScreenshot(file) {
@@ -1472,6 +1485,115 @@ if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").catch(() => { /* offline shell is optional */ });
 }
 
+// ── What's new, and how to use it ──────────────────────────────────────────
+
+/**
+ * Fill and show the release notes. `first` switches the wording from "what changed" to "what this
+ * is", because a pilot opening the app for the first time is not owed a changelog — everything is
+ * new to them and what they need is the instructions.
+ */
+function showWhatsNew({ first = false } = {}) {
+  $("whatsnew-title").textContent = first ? "Welcome to TripTrace" : "What's New";
+  $("whatsnew-sub").textContent = first ? FIRST_RUN_BLURB : UPDATE_BLURB;
+  $("whatsnew-list").innerHTML = NOTES.map((note) => `
+    <div class="wn-item">
+      <svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[note.icon] ?? ""}</svg>
+      <div>
+        <h3>${esc(note.title)}</h3>
+        <p>${note.body}</p>
+      </div>
+    </div>`).join("");
+  openSheet("whatsnew-sheet");
+}
+
+/** Mark the current release seen, so it does not reappear until the notes actually change. */
+function markReleaseSeen() {
+  try { localStorage.setItem(SEEN_KEY, RELEASE); } catch (_) { /* private mode; it shows again */ }
+}
+
+/**
+ * Show the notes once per release. Gated on `RELEASE`, not the asset version: assets bump on every
+ * deploy including pure bug fixes, and a "what's new" that reappears after a typo correction
+ * teaches people to dismiss it unread.
+ */
+function maybeShowWhatsNew() {
+  let seen = null;
+  let hasTrip = false;
+  try {
+    seen = localStorage.getItem(SEEN_KEY);
+    hasTrip = Boolean(localStorage.getItem(LAST_KEY));
+  } catch (_) { seen = null; }
+  if (seen === RELEASE) return;
+  showWhatsNew({ first: seen === null && !hasTrip });
+  markReleaseSeen();
+}
+
+$("whatsnew-done").addEventListener("click", () => closeSheet("whatsnew-sheet"));
+$("menu-whatsnew").addEventListener("click", () => {
+  closeSheet("menu-sheet");
+  showWhatsNew();
+  markReleaseSeen();
+});
+
+// ── The safety assessment, shown rather than offered ────────────────────────
+
+/**
+ * Put the assessment on screen after every fresh analysis.
+ *
+ * It was reachable before — a tab, and a button that mostly led to a download — which meant the
+ * one part of this app that says in words what the numbers mean was the part a pilot could skip
+ * without noticing. A fatigue estimate nobody read is not decision support. Every figure in it
+ * comes from the model; nothing is composed here.
+ */
+function showAssessment() {
+  const r = report();
+  const t = trace();
+  if (!r || !t) return;
+  const out = t.outputs ?? {};
+  const low = out.trip_min_effectiveness_pct;
+  const info = bandFor(low);
+  const crossings = out.threshold_crossings ?? [];
+
+  $("assessment-body").innerHTML = `
+    <div class="as-verdict">
+      <span class="as-pct" style="color:${bandColor(low)}">${esc(pct(low))}</span>
+      <span class="as-band" style="color:${bandColor(low)}">${esc(info.label ?? "")}</span>
+    </div>
+    <p class="as-where">Lowest estimated effectiveness${
+      out.risk_label ? ` · ${esc(out.risk_label)}` : ""}</p>
+
+    <div class="as-block">
+      <h3>What this trip does to you</h3>
+      <p class="as-text">${esc(r.narrative ?? "")}</p>
+    </div>
+
+    ${crossings.length ? `<div class="as-block">
+      <h3>Where it crosses a threshold</h3>
+      <ul class="as-list">${crossings.map((c) =>
+        `<li><strong>Duty day ${esc(c.duty_day)}</strong> — ${esc(c.trigger ?? "")}</li>`).join("")}</ul>
+    </div>` : ""}
+
+    ${(r.recommendations ?? []).length ? `<div class="as-block">
+      <h3>What helps</h3>
+      <ul class="as-list">${r.recommendations.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>
+    </div>` : ""}
+
+    <div class="as-block">
+      <h3>The write-up</h3>
+      <p class="as-text">${esc(r.safety_report ?? "")}</p>
+    </div>
+
+    <p class="as-note">${esc(out.transparency?.reminder ?? "")}</p>`;
+
+  openSheet("assessment-sheet");
+}
+
+$("assessment-done").addEventListener("click", () => closeSheet("assessment-sheet"));
+$("assessment-summary").addEventListener("click", () => {
+  closeSheet("assessment-sheet");
+  openSummary();
+});
+
 // ── How the pilot got to base, and stations the table has never seen ───────
 
 function renderCommute() {
@@ -1619,6 +1741,7 @@ $("menu-commute").addEventListener("click", async () => {
   requestAnimationFrame(moveSegIndicator);
   if (restore()) renderAll();
   else { $("tabbar").hidden = true; setTab("trip"); }
+  maybeShowWhatsNew();
   // A countdown that never moves is worse than no countdown. Only the digits are touched, so the
   // card's entrance animation is not restarted once a second.
   let lastCount = "";
