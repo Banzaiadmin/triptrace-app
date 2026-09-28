@@ -26,13 +26,13 @@ import {
   SLEEP_OPPORTUNITY_SUBTRACTIONS,
   SCORER_CALIBRATION as CAL,
   WORKLOAD,
-} from "./constants.js?v=31";
-import { deepCopy, hmFromHours, minBy, pyFloatStr, pyFmt, pyRound } from "./py.js?v=31";
-import { fmtUtc, parseUtc } from "./tz.js?v=31";
+} from "./constants.js?v=32";
+import { deepCopy, hmFromHours, minBy, pyFloatStr, pyFmt, pyRound } from "./py.js?v=32";
+import { fmtUtc, parseUtc } from "./tz.js?v=32";
 
 // Re-exported for the browser harness and older importers.
-export { pyRound } from "./py.js?v=31";
-export { fmtUtc, parseUtc } from "./tz.js?v=31";
+export { pyRound } from "./py.js?v=32";
+export { fmtUtc, parseUtc } from "./tz.js?v=32";
 
 export class ScoringError extends Error {}
 
@@ -308,7 +308,10 @@ function planPriorNights(priorSleep, nightEnd, commute) {
       end = parseUtc(entry.end_utc);
       if (!Number.isFinite(start) || !Number.isFinite(end)) continue;
       if (end <= start || start >= nightEnd) continue;
-      index = Math.floor(hoursBetween(end, nightEnd) / 24) + 1;
+      // By MIDPOINT, not by end — see scorer.py, which this mirrors. Attributing by end silently
+      // dropped any night running past the notional 08:00 wake.
+      const midpoint = start + (end - start) / 2;
+      index = Math.floor(hoursBetween(midpoint, nightEnd) / 24) + 1;
     } else {
       index = Number.parseInt(entry.nights_before, 10);
       const hours = Number(entry.hours);

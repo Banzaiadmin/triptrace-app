@@ -11,11 +11,11 @@
  * and therefore works with no signal.
  */
 
-import { ParseError, parseTripBoard } from "./parser.js?v=31";
-import { ScoringError, scoreTrace } from "./scorer.js?v=31";
-import { buildReport } from "./report.js?v=31";
-import { applyRevisions, normalizeRevisions, workloadPoints } from "./revisions.js?v=31";
-import { WORKLOAD } from "./constants.js?v=31";
+import { ParseError, parseTripBoard } from "./parser.js?v=32";
+import { ScoringError, scoreTrace } from "./scorer.js?v=32";
+import { buildReport } from "./report.js?v=32";
+import { applyRevisions, normalizeRevisions, workloadPoints } from "./revisions.js?v=32";
+import { WORKLOAD } from "./constants.js?v=32";
 import {
   VENDORS,
   WearableError,
@@ -24,7 +24,7 @@ import {
   importSleep as normalizeSleepPayload,
   matchToRestPeriods,
   toActualSleep,
-} from "./wearables.js?v=31";
+} from "./wearables.js?v=32";
 
 export const ENGINE = "device";
 export const WEARABLE_VENDORS = VENDORS;
@@ -45,7 +45,7 @@ export const CARRIERS = Object.freeze([
 export class EngineError extends Error {}
 
 /** Re-exported so the shell can echo back what a typed phrase was understood to mean. */
-export { readSleepPhrase } from "./sleep-language.js?v=31";
+export { readSleepPhrase } from "./sleep-language.js?v=32";
 
 export function requireSupportedCarrier(carrier) {
   const id = (carrier || "ups").toLowerCase();

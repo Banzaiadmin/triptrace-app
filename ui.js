@@ -12,9 +12,9 @@
  * Where the pilot is right now is shown by position on the chart, not by a made-up percentage.
  */
 
-import { traceModel, renderTrace, sparkline, bandFor, bandColor, bandVar, EFF_THRESHOLD } from "./trace.js?v=31";
+import { traceModel, renderTrace, sparkline, bandFor, bandColor, bandVar, EFF_THRESHOLD } from "./trace.js?v=32";
 
-const V = "31";
+const V = "32";
 const $ = (id) => document.getElementById(id);
 const LAST_KEY = "triptrace.last";
 const REVISIONS_KEY = "triptrace.revisions";
@@ -1609,6 +1609,11 @@ $("menu-commute").addEventListener("click", async () => {
   renderVendors();
   loadSamples();
   await engineReady;
+  // The echoes are re-run here, not only in renderNights(). renderNights() draws before the core
+  // has loaded, so `engine` is still null and every restored night reads "couldn't read that" —
+  // for text that parses perfectly and IS used in the analysis. A pilot would delete their own
+  // entries believing they did not work.
+  state.nights.forEach((_, index) => echoNight(index));
   renderCarriers();
   setSource("sample");
   requestAnimationFrame(moveSegIndicator);

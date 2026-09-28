@@ -6,16 +6,16 @@
  * reference: a difference means the port is wrong, never the golden.
  */
 
-import { parseTripBoard } from "./parser.js?v=31";
-import { scoreTrace } from "./scorer.js?v=31";
-import { buildReport } from "./report.js?v=31";
-import { applyRevisions, workloadPoints } from "./revisions.js?v=31";
-import { pyRound, pyFmt, pyRepr, pyFloatStr } from "./py.js?v=31";
-import { readSleepPhrase } from "./sleep-language.js?v=31";
-import { fmtLocal, fmtUtc, localToUtc, parseUtc, utcOffsetMinutes, localParts } from "./tz.js?v=31";
+import { parseTripBoard } from "./parser.js?v=32";
+import { scoreTrace } from "./scorer.js?v=32";
+import { buildReport } from "./report.js?v=32";
+import { applyRevisions, workloadPoints } from "./revisions.js?v=32";
+import { pyRound, pyFmt, pyRepr, pyFloatStr } from "./py.js?v=32";
+import { readSleepPhrase } from "./sleep-language.js?v=32";
+import { fmtLocal, fmtUtc, localToUtc, parseUtc, utcOffsetMinutes, localParts } from "./tz.js?v=32";
 import {
   WearableError, coverageSummary, detectAndNormalize, importSleep, matchToRestPeriods, toActualSleep,
-} from "./wearables.js?v=31";
+} from "./wearables.js?v=32";
 
 /**
  * Floats round-trip through two languages' math libraries; the last bit can differ. Anything the
@@ -102,6 +102,39 @@ export async function runDifferential({ readText, readJson }) {
     const bad = vectors.filter((v) => pyRound(v.value, v.digits) !== v.expected)
       .map((v) => ({ path: `round(${v.value}, ${v.digits})`, expected: v.expected, actual: pyRound(v.value, v.digits) }));
     record("pyRound vs Python round()", bad, vectors.length);
+  }
+  {
+    // Prior sleep and commute. The goldens carry none, so without these the port check ran green
+    // over 25,000 fields while the code that carries fatigue between trips was never executed in
+    // JavaScript. A real attribution bug lived in both implementations and this check is what
+    // would have caught it.
+    const payload = await readJson("goldens/prior_sleep_vectors.json");
+    const text = await readText(`samples/${payload.trace_case}.txt`);
+    const parsed = parseTripBoard(text, { generatedAt: payload.generated_at });
+    const bad = [];
+    for (const expected of payload.cases) {
+      const options = {};
+      if (expected.options.prior_sleep) options.priorSleep = expected.options.prior_sleep;
+      if (expected.options.commute) options.commute = expected.options.commute;
+      let scored;
+      try {
+        scored = scoreTrace(parsed, options);
+      } catch (error) {
+        bad.push({ path: `${expected.name} (threw)`, expected: "scored", actual: error.message });
+        continue;
+      }
+      const got = {
+        trip_min_effectiveness_pct: scored.outputs.trip_min_effectiveness_pct,
+        duty_min_pct: scored.duty_periods.map((d) => d.effectiveness.min_pct),
+        sleep_assumptions: scored.outputs.transparency.sleep_assumptions,
+      };
+      for (const key of Object.keys(got)) {
+        const a = JSON.stringify(got[key]);
+        const b = JSON.stringify(expected[key]);
+        if (a !== b) bad.push({ path: `${expected.name}.${key}`, expected: expected[key], actual: got[key] });
+      }
+    }
+    record("prior sleep + commute vs Python", bad, payload.cases.length * 3);
   }
   {
     // Two implementations of the same grammar. A pilot types free text, and the phone and the

@@ -15,9 +15,9 @@
 
 import {
   BAND_LABELS, EFFECTIVENESS_BANDS, HOTEL_PICKUP_HOURS, REPORT_ALLOWANCE_HOURS, STATIONS,
-} from "./constants.js?v=31";
-import { hmFromHours } from "./py.js?v=31";
-import { fmtLocal, parseUtc } from "./tz.js?v=31";
+} from "./constants.js?v=32";
+import { hmFromHours } from "./py.js?v=32";
+import { fmtLocal, parseUtc } from "./tz.js?v=32";
 
 const BAC_TEXT = {
   green: "negligible impairment equivalence",
