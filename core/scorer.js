@@ -26,13 +26,13 @@ import {
   SLEEP_OPPORTUNITY_SUBTRACTIONS,
   SCORER_CALIBRATION as CAL,
   WORKLOAD,
-} from "./constants.js?v=34";
-import { deepCopy, hmFromHours, minBy, pyFloatStr, pyFmt, pyRound } from "./py.js?v=34";
-import { fmtUtc, parseUtc } from "./tz.js?v=34";
+} from "./constants.js?v=35";
+import { deepCopy, hmFromHours, minBy, pyFloatStr, pyFmt, pyRound } from "./py.js?v=35";
+import { fmtUtc, parseUtc } from "./tz.js?v=35";
 
 // Re-exported for the browser harness and older importers.
-export { pyRound } from "./py.js?v=34";
-export { fmtUtc, parseUtc } from "./tz.js?v=34";
+export { pyRound } from "./py.js?v=35";
+export { fmtUtc, parseUtc } from "./tz.js?v=35";
 
 export class ScoringError extends Error {}
 
@@ -95,19 +95,37 @@ function buildSleepPropensity() {
     if (h >= CAL.body_night_start_hour || h < CAL.body_night_end_hour) { nightSum += raw[m]; nightCount += 1; }
   }
   const nightMean = nightSum / nightCount;
-  return raw.map((v) => v / nightMean);
+  // Quantised to 10 decimals to match scorer.py — cos differs by an ulp between CPython and V8 for
+  // 13 of these entries and the error integrates across a trip. Read that function's comment.
+  return raw.map((v) => pyRound(v / nightMean, 10));
 }
 const SLEEP_PROPENSITY = buildSleepPropensity();
 
 export function sleepPropensity(bodyHour) {
-  const minute = pyRound(((bodyHour % 24) + 24) % 24 * 60) % 1440;
+  // The negative correction is applied ONLY when it is needed. `((x % 24) + 24) % 24` is the usual
+  // idiom and it is not lossless: for a body hour of 9.8416666666666668 it returns
+  // 9.8416666666666686, so the minute index becomes 590.50000000000011 where Python computes
+  // exactly 590.5 — and 590.5 rounds half-to-even down to 590 while 590.50000000000011 rounds up
+  // to 591. A different row of the table, every sleep step, integrating into a visibly different
+  // reservoir. Python needs no such guard because its `%` already returns a non-negative result
+  // for a positive divisor.
+  const hour = bodyHour % 24;
+  const minute = pyRound((hour < 0 ? hour + 24 : hour) * 60) % 1440;
   return SLEEP_PROPENSITY[minute];
 }
 
+/**
+ * Mirrors scorer.py, including its use of sqrt rather than pow — IEEE 754 requires sqrt to be
+ * correctly rounded and does not require it of pow, and CPython and V8 disagree on pow(x, 0.5)
+ * often enough that ~5,000 steps of it moved the reservoir 7 ppm and flipped a rounded duty
+ * minimum. Read that function's docstring before changing this.
+ */
 export function sleepIntensity(reservoir, capacity) {
   const deficit = Math.max(0, 1 - reservoir / capacity);
-  return MODEL_PARAMS.max_sleep_intensity_units_per_min *
-    Math.pow(deficit, CAL.sleep_intensity_exponent);
+  const factor = CAL.sleep_intensity_exponent === 0.5
+    ? Math.sqrt(deficit)
+    : Math.pow(deficit, CAL.sleep_intensity_exponent);
+  return MODEL_PARAMS.max_sleep_intensity_units_per_min * factor;
 }
 
 export function effectiveness(reservoir, capacity, bodyHour) {
@@ -587,8 +605,10 @@ function annotate(trace, duties, samples, clock) {
     circadianBlock.drift_from_domicile_hours = pyRound(clock.driftAt(report), 2);
     circadianBlock.body_clock_anchor_tz_offset_hours =
       pyRound(clock.baseOffset + clock.driftAt(report), 2);
+    // Name the anchor the parser actually used — see scorer.py.
+    const anchoredAt = String(circadianBlock.anchor_basis ?? "").startsWith("home ") ? "home" : "domicile";
     circadianBlock.anchor_basis =
-      `domicile anchor drifted ${pyFmt(clock.driftAt(report), 1, { sign: true })} h toward the trip's ` +
+      `${anchoredAt} anchor drifted ${pyFmt(clock.driftAt(report), 1, { sign: true })} h toward the trip's ` +
       `sleep pattern by this duty day (cap ${pyFmt(MODEL_PARAMS.body_clock_drift_cap_hours_per_day, 1)} h/day)`;
   }
 }

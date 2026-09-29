@@ -12,13 +12,13 @@
  * Where the pilot is right now is shown by position on the chart, not by a made-up percentage.
  */
 
-import { traceModel, renderTrace, sparkline, bandFor, bandColor, bandVar, EFF_THRESHOLD } from "./trace.js?v=34";
-import { RELEASE, ICONS, NOTES, FIRST_RUN_BLURB, UPDATE_BLURB } from "./whatsnew.js?v=34";
-import { SCORER_CALIBRATION } from "./core/constants.js?v=34";
+import { traceModel, renderTrace, sparkline, bandFor, bandColor, bandVar, EFF_THRESHOLD } from "./trace.js?v=35";
+import { RELEASE, ICONS, NOTES, FIRST_RUN_BLURB, UPDATE_BLURB } from "./whatsnew.js?v=35";
+import { SCORER_CALIBRATION } from "./core/constants.js?v=35";
 
 const { circadian_peak_hour: CIRCADIAN_PEAK_HOUR } = SCORER_CALIBRATION;
 
-const V = "34";
+const V = "35";
 const $ = (id) => document.getElementById(id);
 const LAST_KEY = "triptrace.last";
 const REVISIONS_KEY = "triptrace.revisions";
@@ -27,6 +27,7 @@ const TZ_KEY = "triptrace.station-tz";
 const COMMUTE_KEY = "triptrace.commute";
 const NIGHTS_KEY = "triptrace.prior-nights";
 const SEEN_KEY = "triptrace.seen-release";
+const HOME_TZ_KEY = "triptrace.home-tz";
 
 /**
  * The nights before the trip. Without them the model has to assume the pilot arrived rested, and
@@ -93,6 +94,7 @@ const state = {
   stationTz: {},        // IATA -> IANA, supplied by the pilot for stations the table lacks
   commute: null,        // null = not asked yet
   nights: ["", "", ""], // plain language, one per night before the trip
+  homeTz: null,         // where the pilot sleeps; null = same as base
   installPrompt: null,
 };
 
@@ -1250,7 +1252,7 @@ async function rerun() {
     state.payload = engine.analyzeText(transcript, {
       carrier: state.carrier, actualSleep: state.sleep, revisions: revisionsPayload(),
       factors: commuteFactors(),
-      priorSleep: priorSleepPayload(), commute: state.commute,
+      priorSleep: priorSleepPayload(), commute: state.commute, homeTz: state.homeTz,
       stationTzOverrides: Object.keys(state.stationTz).length ? state.stationTz : null,
     });
     state.payload.transcript = transcript;
@@ -1370,7 +1372,7 @@ async function analyzeTranscript(text, carrier, { ocr = false } = {}) {
   const payload = engine.analyzeText(text, {
     carrier, actualSleep: state.sleep, revisions: revisionsPayload(),
     factors: commuteFactors(),
-    priorSleep: priorSleepPayload(), commute: state.commute,
+    priorSleep: priorSleepPayload(), commute: state.commute, homeTz: state.homeTz,
     stationTzOverrides: Object.keys(state.stationTz).length ? state.stationTz : null,
   });
   payload.transcript = text;
@@ -1668,6 +1670,25 @@ $("assessment-summary").addEventListener("click", () => {
 
 // ── How the pilot got to base, and stations the table has never seen ───────
 
+/**
+ * Where the pilot lives, which anchors the body clock and the WOCL.
+ *
+ * Not the domicile. A commuter sleeps in one timezone and is based in another, and it is the bed
+ * they are used to that sets circadian phase — being assigned to SDF does not move anybody's
+ * window of circadian low. Blank means "same as base", which is the honest default rather than a
+ * silent assumption: the trace says which was used in `anchor_basis`.
+ */
+function renderHomeTz() {
+  $("home-tz").innerHTML = `<option value="">Same as my base</option>`
+    + TZ_CHOICES.map(([tz, label]) =>
+        `<option value="${esc(tz)}" ${state.homeTz === tz ? "selected" : ""}>${esc(label)} · ${esc(tz)}</option>`).join("");
+}
+
+$("home-tz").addEventListener("change", (e) => {
+  state.homeTz = e.target.value || null;
+  try { localStorage.setItem(HOME_TZ_KEY, state.homeTz ?? ""); } catch (_) { /* fine */ }
+});
+
 function renderCommute() {
   $("commute-chips").innerHTML = COMMUTE_CHOICES.map((c) =>
     `<button class="chip" data-c="${c.id}" aria-pressed="${state.commute === c.id}">${esc(c.label)}</button>`).join("");
@@ -1798,6 +1819,8 @@ $("menu-commute").addEventListener("click", async () => {
     const saved = JSON.parse(localStorage.getItem(NIGHTS_KEY) ?? "[]");
     if (Array.isArray(saved)) state.nights = NIGHT_LABELS.map((_, i) => String(saved[i] ?? ""));
   } catch (_) { state.nights = ["", "", ""]; }
+  try { state.homeTz = localStorage.getItem(HOME_TZ_KEY) || null; } catch (_) { state.homeTz = null; }
+  renderHomeTz();
   renderCommute();
   renderNights();
   renderVendors();

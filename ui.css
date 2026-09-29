@@ -775,3 +775,11 @@ textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 @media (prefers-reduced-motion: reduce) {
   .wn-item { animation: none; }
 }
+
+
+/* Where the pilot lives — the body-clock anchor. Styled like the station-sheet selects. */
+#home-tz {
+  width: 100%; padding: 10px 12px; border-radius: var(--radius); font: inherit; font-size: 15px;
+  background: var(--surface-2); color: var(--ink); border: 1px solid var(--hair);
+}
+#home-tz:focus { outline: 2px solid var(--accent); outline-offset: -1px; }

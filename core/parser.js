@@ -31,8 +31,8 @@ import {
   REPORT_ALLOWANCE_HOURS,
   SLEEP_OPPORTUNITY_SUBTRACTIONS,
   STATIONS,
-} from "./constants.js?v=34";
-import { deepCopy, hmFromMinutes, pyFmt, pyRepr, pyRound, splitLines, uniqueInOrder } from "./py.js?v=34";
+} from "./constants.js?v=35";
+import { deepCopy, hmFromMinutes, pyFmt, pyRepr, pyRound, splitLines, uniqueInOrder } from "./py.js?v=35";
 import {
   HOUR,
   MINUTE,
@@ -43,7 +43,7 @@ import {
   localParts,
   localToUtc,
   utcOffsetMinutes,
-} from "./tz.js?v=34";
+} from "./tz.js?v=35";
 
 /** Raised only when the text contains no recognizable Trip Board rows at all. */
 export class ParseError extends Error {}
@@ -542,6 +542,7 @@ function fallbackSplit(total, defaultA, defaultB) {
 export function parseTripBoard(text, {
   domicile = null,
   domicileTz = null,
+  homeTz = null,
   stationTzOverrides = null,
   generatedAt = null,
   notes = null,
@@ -559,10 +560,22 @@ export function parseTripBoard(text, {
 
   domicile = (domicile || info.header_domicile || "SDF").toUpperCase();
   domicileTz = domicileTz || stationTz(domicile, stationTzOverrides) || "America/New_York";
+  // Where the pilot habitually sleeps, which anchors the body clock and the WOCL. Not the
+  // domicile: a commuter lives in one zone and is based in another, and being assigned to SDF
+  // does not move anybody's window of circadian low. See trip_board_parser.py.
+  let homeTzResolved = homeTz || domicileTz;
   try {
     utcOffsetMinutes(domicileTz, 0);                       // zoneinfo would raise here too
   } catch (error) {
     throw new ParseError(`Unknown domicile timezone ${pyRepr(domicileTz)}.`);
+  }
+  try {
+    utcOffsetMinutes(homeTzResolved, 0);
+  } catch (_) {
+    missing.add("unknown_home_tz",
+      `Home timezone ${pyRepr(homeTzResolved)} is not a zone this device knows; the body clock is `
+      + `anchored to the domicile ${domicileTz} instead.`);
+    homeTzResolved = domicileTz;
   }
 
   resolveTimes(legRows, stationTzOverrides, missing);
@@ -624,11 +637,11 @@ export function parseTripBoard(text, {
       if (!(row.depUtc !== null && row.arrUtc !== null)) return;
       allStations.push(row.depStation, row.arrStation);
       const isLast = position === legs.length - 1;
-      builtLegs.push(buildLeg(row, domicileTz, stationTzOverrides, missing,
+      builtLegs.push(buildLeg(row, homeTzResolved, stationTzOverrides, missing,
                               summary && isLast ? summary.credit : null));
     });
 
-    const circadian = buildCircadian(reportUtc, releaseUtc, domicileTz, index);
+    const circadian = buildCircadian(reportUtc, releaseUtc, homeTzResolved, index, domicileTz);
 
     let nextReport = null;
     if (index + 1 < groups.length) {
@@ -643,8 +656,8 @@ export function parseTripBoard(text, {
 
     dutyPeriods.push({
       day_index: index + 1,
-      report: clock(reportUtc, timed[0].depStation, domicileTz, stationTzOverrides, "computed"),
-      release: clock(releaseUtc, timed[timed.length - 1].arrStation, domicileTz, stationTzOverrides, "computed"),
+      report: clock(reportUtc, timed[0].depStation, homeTzResolved, stationTzOverrides, "computed"),
+      release: clock(releaseUtc, timed[timed.length - 1].arrStation, homeTzResolved, stationTzOverrides, "computed"),
       legs: builtLegs,
       date_local: fmtLocal(stationTz(timed[0].depStation, stationTzOverrides) || domicileTz, reportUtc).slice(0, 10),
       scheduled_duty: {
@@ -728,18 +741,18 @@ function legIsInternational(leg, overrides) {
  * The three-clock view. body_clock is the domicile-anchored view with zero drift — the scorer
  * owns drift (MODEL_PARAMS.body_clock_drift_cap_hours_per_day).
  */
-function clock(utcMs, station, domicileTz, overrides, source) {
+function clock(utcMs, station, bodyTz, overrides, source) {
   const tzName = station ? stationTz(station, overrides) : null;
   return {
     utc: fmtUtc(utcMs),
     station_local: tzName ? fmtLocal(tzName, utcMs) : null,
     station_tz: tzName,
-    body_clock: fmtLocal(domicileTz, utcMs),
+    body_clock: fmtLocal(bodyTz, utcMs),
     source,
   };
 }
 
-function buildLeg(row, domicileTz, overrides, missing, dutyCredit) {
+function buildLeg(row, bodyTz, overrides, missing, dutyCredit) {
   const intl = legIsInternational(row, overrides);
   const raw = {
     eqp: row.eqp,
@@ -763,8 +776,8 @@ function buildLeg(row, domicileTz, overrides, missing, dutyCredit) {
     flight: row.flight,
     dep_station: row.depStation,
     arr_station: row.arrStation,
-    dep: clock(row.depUtc, row.depStation, domicileTz, overrides, "printed"),
-    arr: clock(row.arrUtc, row.arrStation, domicileTz, overrides, "printed"),
+    dep: clock(row.depUtc, row.depStation, bodyTz, overrides, "printed"),
+    arr: clock(row.arrUtc, row.arrStation, bodyTz, overrides, "printed"),
     position: row.position,
     block: { scheduled_hours: minutesToHours(row.blockMin), actual_hours: null, source: "printed" },
     is_international: intl,
@@ -795,17 +808,18 @@ function buildAugmentation(row, international) {
 }
 
 /** WOCL is 0200-0600 *body-clock*; expressed here in UTC for the day it actually bears on. */
-function buildCircadian(reportUtc, releaseUtc, domicileTz, dayIndex0) {
-  const offsetHours = utcOffsetMinutes(domicileTz, reportUtc) / 60;
+/** Anchored to where the pilot sleeps, not where they are based. See trip_board_parser.py. */
+function buildCircadian(reportUtc, releaseUtc, homeTz, dayIndex0, domicileTz = null) {
+  const offsetHours = utcOffsetMinutes(homeTz, reportUtc) / 60;
   const [startH, startM] = MODEL_PARAMS.wocl_body_clock_start.split(":").map(Number);
   const [endH, endM] = MODEL_PARAMS.wocl_body_clock_end.split(":").map(Number);
 
   let best = null;
-  const bodyDate = localParts(domicileTz, reportUtc);
+  const bodyDate = localParts(homeTz, reportUtc);
   for (const offsetDays of [0, 1]) {
     const day = addDays(bodyDate, offsetDays);
-    const start = localToUtc(domicileTz, day.year, day.month, day.day, startH, startM);
-    const end = localToUtc(domicileTz, day.year, day.month, day.day, endH, endM);
+    const start = localToUtc(homeTz, day.year, day.month, day.day, startH, startM);
+    const end = localToUtc(homeTz, day.year, day.month, day.day, endH, endM);
     const overlap = (Math.min(end, releaseUtc) - Math.max(start, reportUtc)) / 1000;
     const distance = overlap > 0 ? 0
       : Math.min(Math.abs(start - releaseUtc), Math.abs(reportUtc - end)) / 1000;
@@ -815,8 +829,12 @@ function buildCircadian(reportUtc, releaseUtc, domicileTz, dayIndex0) {
 
   return {
     body_clock_anchor_tz_offset_hours: offsetHours,
-    anchor_basis: `domicile ${domicileTz}; parser applies zero drift — the scorer applies drift up to ` +
-      `${pyFmt(MODEL_PARAMS.body_clock_drift_cap_hours_per_day, 1)} h/day toward the duty pattern`,
+    anchor_basis: (domicileTz === null || homeTz === domicileTz)
+      ? `domicile ${homeTz}; parser applies zero drift — the scorer applies drift up to `
+        + `${pyFmt(MODEL_PARAMS.body_clock_drift_cap_hours_per_day, 1)} h/day toward the duty pattern`
+      : `home ${homeTz}, where the pilot habitually sleeps, not domicile ${domicileTz}; parser `
+        + `applies zero drift — the scorer applies drift up to `
+        + `${pyFmt(MODEL_PARAMS.body_clock_drift_cap_hours_per_day, 1)} h/day toward the duty pattern`,
     drift_from_domicile_hours: 0.0,
     wocl_window: { start_utc: fmtUtc(best.start), end_utc: fmtUtc(best.end) },
     confidence: dayIndex0 === 0 ? "high" : "medium",

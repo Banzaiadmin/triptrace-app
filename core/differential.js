@@ -6,16 +6,16 @@
  * reference: a difference means the port is wrong, never the golden.
  */
 
-import { parseTripBoard } from "./parser.js?v=34";
-import { scoreTrace } from "./scorer.js?v=34";
-import { buildReport } from "./report.js?v=34";
-import { applyRevisions, workloadPoints } from "./revisions.js?v=34";
-import { pyRound, pyFmt, pyRepr, pyFloatStr } from "./py.js?v=34";
-import { readSleepPhrase } from "./sleep-language.js?v=34";
-import { fmtLocal, fmtUtc, localToUtc, parseUtc, utcOffsetMinutes, localParts } from "./tz.js?v=34";
+import { parseTripBoard } from "./parser.js?v=35";
+import { scoreTrace, sleepPropensity } from "./scorer.js?v=35";
+import { buildReport } from "./report.js?v=35";
+import { applyRevisions, workloadPoints } from "./revisions.js?v=35";
+import { pyRound, pyFmt, pyRepr, pyFloatStr } from "./py.js?v=35";
+import { readSleepPhrase } from "./sleep-language.js?v=35";
+import { fmtLocal, fmtUtc, localToUtc, parseUtc, utcOffsetMinutes, localParts } from "./tz.js?v=35";
 import {
   WearableError, coverageSummary, detectAndNormalize, importSleep, matchToRestPeriods, toActualSleep,
-} from "./wearables.js?v=34";
+} from "./wearables.js?v=35";
 
 /**
  * Floats round-trip through two languages' math libraries; the last bit can differ. Anything the
@@ -102,6 +102,49 @@ export async function runDifferential({ readText, readJson }) {
     const bad = vectors.filter((v) => pyRound(v.value, v.digits) !== v.expected)
       .map((v) => ({ path: `round(${v.value}, ${v.digits})`, expected: v.expected, actual: pyRound(v.value, v.digits) }));
     record("pyRound vs Python round()", bad, vectors.length);
+  }
+  {
+    // Every entry of the propensity table. Each multiplies a sleep step, so a single ulp here does
+    // not stay an ulp — it integrates over thousands of steps into a visibly different number.
+    const payload = await readJson("goldens/sleep_propensity_vectors.json");
+    const bad = [];
+    payload.table.forEach((expected, minute) => {
+      const actual = sleepPropensity(minute / 60);
+      if (actual !== expected) bad.push({ path: `minute ${minute}`, expected, actual });
+    });
+    record("sleep propensity table vs Python", bad, payload.table.length);
+  }
+  {
+    // The commuter path: body clock and WOCL anchored to where the pilot sleeps, not where they
+    // are based. Every golden uses the default, so without these this is unexercised in JS.
+    const payload = await readJson("goldens/home_tz_vectors.json");
+    const text = await readText(`samples/${payload.trace_case}.txt`);
+    const bad = [];
+    for (const expected of payload.cases) {
+      let parsed;
+      try {
+        parsed = parseTripBoard(text, { homeTz: expected.home_tz, generatedAt: payload.generated_at });
+      } catch (error) {
+        bad.push({ path: `${expected.home_tz} (threw)`, expected: "parsed", actual: error.message });
+        continue;
+      }
+      const scored = scoreTrace(parsed);
+      const first = parsed.duty_periods[0];
+      const got = {
+        anchor_offset_hours: first.circadian.body_clock_anchor_tz_offset_hours,
+        anchor_basis: first.circadian.anchor_basis,
+        wocl_window: first.circadian.wocl_window,
+        report_body_clock: first.report.body_clock,
+        trip_min_effectiveness_pct: scored.outputs.trip_min_effectiveness_pct,
+        duty_min_pct: scored.duty_periods.map((d) => d.effectiveness.min_pct),
+      };
+      for (const key of Object.keys(got)) {
+        if (JSON.stringify(got[key]) !== JSON.stringify(expected[key])) {
+          bad.push({ path: `${expected.home_tz}.${key}`, expected: expected[key], actual: got[key] });
+        }
+      }
+    }
+    record("home timezone anchor vs Python", bad, payload.cases.length * 6);
   }
   {
     // Prior sleep and commute. The goldens carry none, so without these the port check ran green
