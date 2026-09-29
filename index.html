@@ -20,7 +20,7 @@
 <title>TripTrace</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-192.png">
-<link rel="stylesheet" href="ui.css?v=33">
+<link rel="stylesheet" href="ui.css?v=34">
 
 <div class="app" id="app">
 
@@ -400,10 +400,12 @@
     <div class="sheet-body">
       <div class="sheet-actions">
         <button class="btn btn-primary" id="summary-share">Download PDF</button>
+        <button class="btn btn-quiet" id="summary-safter">Prepare SAFTEr research comparison</button>
         <button class="btn btn-quiet" id="summary-card">Save as a picture for texting</button>
         <button class="btn btn-quiet" id="summary-print">Print or save as PDF</button>
         <button class="btn btn-quiet" id="summary-copy">Copy as text</button>
       </div>
+      <p class="sub small">Research only: this exports the reviewed schedule and modeled sleep assumptions for comparison with classic SAFTEr. It does not call SAFTE-FAST or validate either model.</p>
       <p class="sub small" id="summary-status"></p>
       <div class="summary" id="summary-doc"></div>
     </div>
@@ -415,4 +417,4 @@
   <p id="working-text">Reading the trip</p>
 </div>
 
-<script type="module" src="ui.js?v=33"></script>
+<script type="module" src="ui.js?v=34"></script>

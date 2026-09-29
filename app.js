@@ -20,7 +20,7 @@ const V = "30";
 
 // The on-device engine, loaded lazily so a browser that cannot run it still has the service path.
 let engine = null;
-const engineReady = import("./core/engine.js?v=33")
+const engineReady = import("./core/engine.js?v=34")
   .then((module) => { engine = module; })
   .catch((error) => { console.warn("on-device engine unavailable; using the service", error); });
 
@@ -690,7 +690,7 @@ $("safety-open").addEventListener("click", () => {
 
 let summaryModule = null;
 async function currentSummary() {
-  summaryModule = summaryModule || await import("./core/summary.js?v=33");
+  summaryModule = summaryModule || await import("./core/summary.js?v=34");
   return summaryModule.summaryModel(state.payload, {
     factors: [...state.factors],
     rescheduled: [...state.resched],
@@ -891,7 +891,7 @@ $("summary-print").addEventListener("click", () => {
 });
 
 $("summary-copy").addEventListener("click", async () => {
-  summaryModule = summaryModule || await import("./core/summary.js?v=33");
+  summaryModule = summaryModule || await import("./core/summary.js?v=34");
   copyText(summaryModule.summaryText(await currentSummary()), $("summary-status"), "Copied as text.");
 });
 for (const sheet of document.querySelectorAll(".sheet-bg")) {

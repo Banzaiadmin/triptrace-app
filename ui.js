@@ -12,10 +12,13 @@
  * Where the pilot is right now is shown by position on the chart, not by a made-up percentage.
  */
 
-import { traceModel, renderTrace, sparkline, bandFor, bandColor, bandVar, EFF_THRESHOLD } from "./trace.js?v=33";
-import { RELEASE, ICONS, NOTES, FIRST_RUN_BLURB, UPDATE_BLURB } from "./whatsnew.js?v=33";
+import { traceModel, renderTrace, sparkline, bandFor, bandColor, bandVar, EFF_THRESHOLD } from "./trace.js?v=34";
+import { RELEASE, ICONS, NOTES, FIRST_RUN_BLURB, UPDATE_BLURB } from "./whatsnew.js?v=34";
+import { SCORER_CALIBRATION } from "./core/constants.js?v=34";
 
-const V = "33";
+const { circadian_peak_hour: CIRCADIAN_PEAK_HOUR } = SCORER_CALIBRATION;
+
+const V = "34";
 const $ = (id) => document.getElementById(id);
 const LAST_KEY = "triptrace.last";
 const REVISIONS_KEY = "triptrace.revisions";
@@ -159,6 +162,66 @@ function untilText(fromMs, toMs) {
 
 const trace = () => state.payload?.trace ?? null;
 const report = () => state.payload?.report ?? null;
+
+function downloadSafterResearchInput() {
+  const t = trace();
+  if (!t || !state.payload?.scored) throw new Error("Analyze a trip first so its schedule and sleep assumptions are available.");
+  const duties = t.duty_periods ?? [];
+  const rests = t.rest_periods ?? [];
+  const events = rests.flatMap((rest) => (rest.sleep_events ?? []).map((sleep) => ({
+    after_duty_day: rest.after_duty_day,
+    station: rest.station ?? null,
+    ...sleep,
+  })));
+  if (!duties.length || !events.length) throw new Error("This trip has no complete duty and modeled sleep timeline to compare.");
+  const payload = {
+    format: "triptrace-safter-research-input",
+    format_version: 1,
+    generated_utc: new Date().toISOString(),
+    purpose: "Private model-to-model research comparison; not operational guidance or validation against crew outcomes.",
+    limitations: [
+      "SAFTEr is a classic research implementation, not proprietary SAFTE-FAST.",
+      "TripTrace sleep events are estimated/observed windows with efficiency assumptions; classic SAFTEr does not accept TripTrace's per-event sleep efficiency, workload, bunk, Auto-Sleep, or phase-shift parameters.",
+      "Compare only at shared timestamps and document initialization/timezone assumptions before interpreting differences.",
+      "Review OCR transcript and all inferred sleep events; screenshot extraction can misread digits.",
+    ],
+    source: {
+      kind: state.payload.ocr ? "trip-board-screenshot-ocr-reviewed" : "trip-board-transcript-reviewed",
+      carrier: state.carrier,
+      transcript: state.payload.transcript,
+      scored: state.payload.scored,
+    },
+    pairing: t.pairing,
+    model_params: t.model_params,
+    // A comparison harness cannot align another model's circadian phase with this one's without
+    // knowing where this one's is. SAFTEr, for instance, derives its acrophase from a `bedtime`
+    // parameter as `bedtime - 5 h`, so its default 23:00 peaks two hours away from ours and the
+    // offset reads as the models disagreeing when it is a parameter nobody chose.
+    circadian_peak_hour: CIRCADIAN_PEAK_HOUR,
+    outputs: t.outputs,
+    duties: duties.map((d) => ({
+      day_index: d.day_index,
+      date_local: d.date_local,
+      report: d.report,
+      release: d.release,
+      circadian: d.circadian,
+      effectiveness: d.effectiveness,
+      legs: (d.legs ?? []).map((leg) => ({
+        flight: leg.flight, dep_station: leg.dep_station, arr_station: leg.arr_station,
+        dep: leg.dep, arr: leg.arr, effectiveness: leg.effectiveness,
+      })),
+    })),
+    sleep_events: events,
+  };
+  const pairingId = String(t.pairing?.pairing_id ?? "trip").replace(/[^A-Za-z0-9_-]/g, "") || "trip";
+  const file = new File([JSON.stringify(payload, null, 2) + "\n"], `TripTrace-${pairingId}-SAFTEr-research-input.json`, { type: "application/json" });
+  const url = URL.createObjectURL(file);
+  const a = document.createElement("a");
+  a.href = url; a.download = file.name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+  return file.name;
+}
 
 // ── Theme ───────────────────────────────────────────────────────────────────
 
@@ -1031,6 +1094,15 @@ $("summary-share").addEventListener("click", async () => {
   }
 });
 $("summary-print").addEventListener("click", () => { $("summary-status").textContent = ""; window.print(); });
+
+$("summary-safter").addEventListener("click", () => {
+  try {
+    const name = downloadSafterResearchInput();
+    $("summary-status").textContent = `Saved ${name}. Run the documented SAFTEr comparison on this file when R and SAFTEr are installed.`;
+  } catch (err) {
+    $("summary-status").textContent = err.message;
+  }
+});
 
 // The one-page card: a phone-sized PNG drawn from the summary model, for sending by text.
 $("summary-card").addEventListener("click", async () => {
