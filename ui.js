@@ -12,13 +12,13 @@
  * Where the pilot is right now is shown by position on the chart, not by a made-up percentage.
  */
 
-import { traceModel, renderTrace, sparkline, bandFor, bandColor, bandVar, EFF_THRESHOLD } from "./trace.js?v=35";
-import { RELEASE, ICONS, NOTES, FIRST_RUN_BLURB, UPDATE_BLURB } from "./whatsnew.js?v=35";
-import { SCORER_CALIBRATION } from "./core/constants.js?v=35";
+import { traceModel, renderTrace, sparkline, bandFor, bandColor, bandVar, EFF_THRESHOLD } from "./trace.js?v=37";
+import { RELEASE, ICONS, NOTES, FIRST_RUN_BLURB, UPDATE_BLURB } from "./whatsnew.js?v=37";
+import { SCORER_CALIBRATION } from "./core/constants.js?v=37";
 
 const { circadian_peak_hour: CIRCADIAN_PEAK_HOUR } = SCORER_CALIBRATION;
 
-const V = "35";
+const V = "37";
 const $ = (id) => document.getElementById(id);
 const LAST_KEY = "triptrace.last";
 const REVISIONS_KEY = "triptrace.revisions";

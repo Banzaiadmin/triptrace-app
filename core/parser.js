@@ -31,8 +31,8 @@ import {
   REPORT_ALLOWANCE_HOURS,
   SLEEP_OPPORTUNITY_SUBTRACTIONS,
   STATIONS,
-} from "./constants.js?v=35";
-import { deepCopy, hmFromMinutes, pyFmt, pyRepr, pyRound, splitLines, uniqueInOrder } from "./py.js?v=35";
+} from "./constants.js?v=37";
+import { deepCopy, hmFromMinutes, pyFmt, pyRepr, pyRound, splitLines, uniqueInOrder } from "./py.js?v=37";
 import {
   HOUR,
   MINUTE,
@@ -43,7 +43,7 @@ import {
   localParts,
   localToUtc,
   utcOffsetMinutes,
-} from "./tz.js?v=35";
+} from "./tz.js?v=37";
 
 /** Raised only when the text contains no recognizable Trip Board rows at all. */
 export class ParseError extends Error {}
@@ -65,8 +65,9 @@ const TOTALS_TOLERANCE_MIN = 1;
 // Two-digit years on the Trip Board are 20xx.
 const CENTURY = 2000;
 
+// The optional bid suffix: a board titled `SDFZ 757` is still SDF. See trip_board_parser.py.
 const HEADER_RE =
-  /Trip\s*Details\s*[-–]\s*(?<trip>[A-Z0-9?]+)\s*[-–]\s*(?<domicile>[A-Z]{3})\s+(?<fleet>[A-Z0-9/?]+)/i;
+  /Trip\s*Details\s*[-–]\s*(?<trip>[A-Z0-9?]+)\s*[-–]\s*(?<domicile>[A-Z]{3})(?<bidSuffix>[A-Z])?\s+(?<fleet>[A-Z0-9/?]+)/i;
 
 const LEG_RE = new RegExp(
   "^\\s*(?:(?<eqp>[A-Z]{1,4})\\s+)?" +
@@ -83,6 +84,78 @@ const LEG_RE = new RegExp(
 
 const SUMMARY_RE =
   /^\s*(?<blk>\d{1,3}:\d{2})\s+(?<duty>\d{1,3}:\d{2})\s+(?:(?<cr>\d{1,3}:\d{2}[A-Z]?)\s+)?(?<lo>\d{1,3}:\d{2})\s*$/;
+
+// CMS "Time Detail" — spec 2B. A second screen of the same trip. Mirrors trip_board_parser.py;
+// read that module's comment for what each difference is and why it matters.
+const CMS_LEG_RE = new RegExp(
+  "^\\s*(?:(?<pairing>[A-Z0-9]{4,})\\s+)?" +
+  "(?<flt>[A-Z0-9]+)-(?<date>\\d{1,2}/\\d{1,2}/\\d{2,4})\\s+" +
+  "(?<dep>[A-Z]{3})(?<arr>[A-Z]{3})\\s+" +
+  "(?:(?<eqp>DH|CML|DHD)\\s+)?" +
+  "\\((?<dep_dow>[A-Z]{2})?(?<dep_lh>\\d{1,2})\\)\\s*(?<dep_z>\\d{3,4})\\s+" +
+  "(?:(?<actual_out>\\d{3,4})\\s+(?<actual_in>\\d{3,4})\\s+)?" +
+  "\\((?<arr_dow>[A-Z]{2})?(?<arr_lh>\\d{1,2})\\)\\s*(?<arr_z>\\d{3,4})\\s+" +
+  "(?<blk>\\d{3,4})\\b",
+);
+const CMS_TOTALS_RE = /\b(?:SR|AR|ST|AT|SD|AD)\s*=\s*\d{1,4}:\d{2}/;
+const CMS_FIELD_RE = /\b(?<key>SR|AR|ST|AT|SD|AD)\s*=\s*(?<value>\d{1,4}:\d{2})/g;
+const CMS_SUMMARY_RE = /Trip\s*Summary\s*TAFB\s*=\s*(?<tafb>\d{1,4}:\d{2})/i;
+
+/** `1717` -> `17:17`. CMS drops the colon; everything downstream expects it. */
+function cmsHhmm(text) {
+  const digits = String(text).trim();
+  return `${digits.slice(0, -2) || "0"}:${digits.slice(-2)}`;
+}
+
+/** Spec 2B: prefer an actual over a scheduled value. See trip_board_parser.py. */
+function cmsLegFields(groups) {
+  const flown = Boolean(groups.actual_out && groups.actual_in);
+  return {
+    eqp: groups.eqp ?? null,
+    date: groups.date,
+    pairing: groups.pairing,
+    flt: groups.flt,
+    pos: null,                      // CMS does not print it; never invented
+    dep: groups.dep,
+    arr: groups.arr,
+    dep_dow: groups.dep_dow ?? null,
+    dep_lh: groups.dep_lh,
+    dep_z: cmsHhmm(flown ? groups.actual_out : groups.dep_z),
+    arr_dow: groups.arr_dow ?? null,
+    arr_lh: groups.arr_lh,
+    arr_z: cmsHhmm(flown ? groups.actual_in : groups.arr_z),
+    blk: cmsHhmm(groups.blk),
+    scheduled_dep_z: flown ? cmsHhmm(groups.dep_z) : null,
+    scheduled_arr_z: flown ? cmsHhmm(groups.arr_z) : null,
+    flown,
+  };
+}
+
+/** Totals for one duty, preferring an actual over a scheduled value when they differ (spec 2B). */
+function cmsTotalsFields(line) {
+  const found = {};
+  CMS_FIELD_RE.lastIndex = 0;
+  for (const m of line.matchAll(CMS_FIELD_RE)) found[m.groups.key] = m.groups.value;
+  const notes = [];
+  const pick = (scheduled, actual, label) => {
+    const s = found[scheduled];
+    const a = found[actual];
+    if (s && a && s !== a) {
+      notes.push(`${label} actual ${a} differs from scheduled ${s}; the actual is used.`);
+      return a;
+    }
+    return a ?? s;
+  };
+  return {
+    fields: {
+      blk: pick("ST", "AT", "Block") ?? "0:00",
+      duty: pick("SD", "AD", "Duty") ?? "0:00",
+      cr: null,
+      lo: pick("SR", "AR", "Rest") ?? "0:00",
+    },
+    notes,
+  };
+}
 
 const COLUMN_HEADER_RE = /Pairing.*Blk.*Duty/i;
 const FOOTER_HINT_RE = /TAFB|Duty\s*Days|PDiem|Out\s*Credit/i;
@@ -162,6 +235,12 @@ class LegRow {
     else this.deadheadKind = null;
 
     // Resolved later, once timezones are applied.
+    // The printed `(L)` hour belongs to the SCHEDULED time even when actuals are present, so the
+    // schedule is kept for the cross-check while the actual goes on the timeline. See the Python.
+    this.flown = Boolean(groups.flown);
+    this.scheduledDepZuluMin = groups.scheduled_dep_z ? hmToMinutes(groups.scheduled_dep_z) : null;
+    this.scheduledArrZuluMin = groups.scheduled_arr_z ? hmToMinutes(groups.scheduled_arr_z) : null;
+
     this.depUtc = null;
     this.arrUtc = null;
   }
@@ -204,11 +283,13 @@ function normalize(line) {
 function scan(text, missing) {
   const rows = [];
   const info = {};
+  let closed = false;
   const setDefault = (key, value) => { if (!(key in info)) info[key] = value; };
 
   for (const rawLine of splitLines(text)) {
     const line = normalize(rawLine);
     if (!line.trim()) continue;
+    if (closed) continue;                    // whatever follows belongs to the next trip
 
     const header = HEADER_RE.exec(line);
     if (header) {
@@ -233,6 +314,37 @@ function scan(text, missing) {
       continue;
     }
 
+    const cmsLeg = CMS_LEG_RE.exec(line);
+    if (cmsLeg) {
+      const fields = cmsLegFields(cmsLeg.groups);
+      rows.push(new LegRow(fields, line));
+      info.source_screen = "cms_time_detail";
+      if (fields.flown) info.cms_has_actuals = true;
+      continue;
+    }
+
+    if (CMS_TOTALS_RE.test(line)) {
+      const { fields, notes } = cmsTotalsFields(line);
+      rows.push(new SummaryRow(fields, line));
+      info.source_screen = "cms_time_detail";
+      // Accumulated, not one line each: on a flown trip every duty differs from its schedule.
+      (info.cms_actual_notes ??= []).push(...notes);
+      continue;
+    }
+
+    const cmsSummary = CMS_SUMMARY_RE.exec(line);
+    if (cmsSummary) {
+      info.source_screen = "cms_time_detail";
+      // A Trip Summary CLOSES a trip. Before any legs it is the previous trip's tail; the first
+      // after legs is this one's; anything below belongs to the next. See trip_board_parser.py —
+      // "last one wins" took TAFB=17:05 from a trailing 9999 reserve line.
+      if (rows.some((r) => r instanceof LegRow)) {
+        if (info.footer_tafb_min === undefined) info.footer_tafb_min = hmToMinutes(cmsSummary.groups.tafb);
+        closed = true;
+      }
+      continue;
+    }
+
     if (FOOTER_HINT_RE.test(line)) {
       Object.assign(info, parseFooter(line));
       continue;
@@ -243,6 +355,22 @@ function scan(text, missing) {
       `Unparsed Trip Board line: ${pyRepr(line.trim())}`,
       "Any leg, duty, or layover this line encodes is absent from the trace.",
     );
+  }
+
+  // CMS keeps counting rest past the end of the trip; the Trip Board prints 0:00 there. Left
+  // alone it becomes a 110-hour layover inside the pairing. See trip_board_parser.py.
+  if (info.source_screen === "cms_time_detail") {
+    for (let i = rows.length - 1; i >= 0; i -= 1) {
+      if (rows[i] instanceof SummaryRow) {
+        if (rows[i].layoverMin) {
+          missing.add("ambiguous",
+            `CMS printed ${hmFromMinutes(rows[i].layoverMin)} of rest after the final duty; that is the gap `
+            + "until the next trip, not a layover inside this one, and it is excluded.");
+          rows[i].layoverMin = 0;
+        }
+        break;
+      }
+    }
   }
 
   return { rows, info };
@@ -381,9 +509,13 @@ function resolveTimes(legs, overrides, missing) {
     }
     previousArrival = leg.arrUtc;
 
-    crossCheckLocal(leg, leg.depStation, leg.depUtc, leg.depLocalHour, leg.depDow,
+    let depCheck = leg.scheduledDepZuluMin === null ? leg.depUtc : base + leg.scheduledDepZuluMin * MINUTE;
+    let arrCheck = leg.scheduledArrZuluMin === null ? leg.arrUtc : base + leg.scheduledArrZuluMin * MINUTE;
+    if (arrCheck < depCheck) arrCheck += 24 * HOUR;
+
+    crossCheckLocal(leg, leg.depStation, depCheck, leg.depLocalHour, leg.depDow,
                     "departure", overrides, missing);
-    crossCheckLocal(leg, leg.arrStation, leg.arrUtc, leg.arrLocalHour, leg.arrDow,
+    crossCheckLocal(leg, leg.arrStation, arrCheck, leg.arrLocalHour, leg.arrDow,
                     "arrival", overrides, missing);
   }
 }
@@ -699,7 +831,7 @@ export function parseTripBoard(text, {
     missing_data: missing.items,
   };
 
-  addStandingGaps(trace, missing);
+  addStandingGaps(trace, missing, info.source_screen ?? null, info.cms_actual_notes ?? null);
   return prune(trace);
 }
 
@@ -776,8 +908,8 @@ function buildLeg(row, bodyTz, overrides, missing, dutyCredit) {
     flight: row.flight,
     dep_station: row.depStation,
     arr_station: row.arrStation,
-    dep: clock(row.depUtc, row.depStation, bodyTz, overrides, "printed"),
-    arr: clock(row.arrUtc, row.arrStation, bodyTz, overrides, "printed"),
+    dep: clock(row.depUtc, row.depStation, bodyTz, overrides, row.flown ? "actual" : "printed"),
+    arr: clock(row.arrUtc, row.arrStation, bodyTz, overrides, row.flown ? "actual" : "printed"),
     position: row.position,
     block: { scheduled_hours: minutesToHours(row.blockMin), actual_hours: null, source: "printed" },
     is_international: intl,
@@ -1007,19 +1139,53 @@ function buildPairing(pairingId, groups, dutyPeriods, info, allStations, overrid
 }
 
 function defaultNotes(info) {
+  // Provenance, in the trace itself. Where the times came from is part of the answer.
+  if (info.source_screen === "cms_time_detail") {
+    const flown = Boolean(info.cms_has_actuals);
+    const times = flown
+      ? "ACTUAL — the out and in columns carried real times, and those are what the timeline uses"
+      : "scheduled: the actual columns on this screen are empty, so the trip has not flown";
+    return `Parsed from a CMS Time Detail screen by trip_board_parser. Times are ${times}. `
+      + "Report/release are computed (not printed on this screen) by solving the printed Duty and "
+      + "rest columns. Sleep and effectiveness are not modeled here.";
+  }
   const title = info.title ?? "UPS Trip Board";
-  return `Parsed from a Trip Board screenshot (${title}) by trip_board_parser. Times are scheduled, not ` +
-    "actual. Report/release are computed (not printed on this screen) by solving the printed " +
-    "Duty and L/O columns. Sleep and effectiveness are not modeled here.";
+  return `Parsed from a Trip Board screenshot (${title}) by trip_board_parser. Times are `
+    + "scheduled, not actual. Report/release are computed (not printed on this screen) by solving "
+    + "the printed Duty and L/O columns. Sleep and effectiveness are not modeled here.";
 }
 
 /** The Trip Board structurally cannot show these; spec 6 wants them surfaced every run. */
-function addStandingGaps(trace, missing) {
-  missing.add(
-    "unknown_actual",
-    "Trip Board shows scheduled times only — no actual block times, delays, or reroutes.",
-    "Duty length, WOCL overlap, and where minimum effectiveness lands if legs run long.",
-  );
+function addStandingGaps(trace, missing, sourceScreen = null, actualNotes = null) {
+  if (sourceScreen === "cms_time_detail") {
+    const flown = trace.duty_periods.some((d) => d.legs.some(
+      (l) => l.dep.source === "actual" || l.arr.source === "actual"));
+    if (flown) {
+      // Nothing added on purpose — see trip_board_parser.py. `missing_data` lists what the model
+      // cannot see; a flown trip with real times is the opposite, and the fact lives in
+      // meta.notes. An "answered" kind would also fail the schema's enum.
+    } else {
+      missing.add(
+        "unknown_actual",
+        "CMS prints actual and scheduled side by side, but this trip has not flown, so the actual "
+        + "columns are empty and these times are projections.",
+        "Duty length, WOCL overlap, and where minimum effectiveness lands if legs run long.",
+      );
+    }
+    // Recording the absence beats inventing a seat: augmentation and bunk credit key off it.
+    missing.add(
+      "ambiguous",
+      "The CMS Time Detail screen does not print the crew position, so no seat is recorded for "
+      + "any leg.",
+      "Nothing in the current model, but augmentation and bunk credit would need it.",
+    );
+  } else {
+    missing.add(
+      "unknown_actual",
+      "Trip Board shows scheduled times only — no actual block times, delays, or reroutes.",
+      "Duty length, WOCL overlap, and where minimum effectiveness lands if legs run long.",
+    );
+  }
   missing.add(
     "no_commute_info",
     `No commute to ${trace.meta.domicile} before duty day 1 was provided.`,

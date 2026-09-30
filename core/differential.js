@@ -6,16 +6,16 @@
  * reference: a difference means the port is wrong, never the golden.
  */
 
-import { parseTripBoard } from "./parser.js?v=35";
-import { scoreTrace, sleepPropensity } from "./scorer.js?v=35";
-import { buildReport } from "./report.js?v=35";
-import { applyRevisions, workloadPoints } from "./revisions.js?v=35";
-import { pyRound, pyFmt, pyRepr, pyFloatStr } from "./py.js?v=35";
-import { readSleepPhrase } from "./sleep-language.js?v=35";
-import { fmtLocal, fmtUtc, localToUtc, parseUtc, utcOffsetMinutes, localParts } from "./tz.js?v=35";
+import { parseTripBoard } from "./parser.js?v=37";
+import { scoreTrace, sleepPropensity } from "./scorer.js?v=37";
+import { buildReport } from "./report.js?v=37";
+import { applyRevisions, workloadPoints } from "./revisions.js?v=37";
+import { pyRound, pyFmt, pyRepr, pyFloatStr } from "./py.js?v=37";
+import { readSleepPhrase } from "./sleep-language.js?v=37";
+import { fmtLocal, fmtUtc, localToUtc, parseUtc, utcOffsetMinutes, localParts } from "./tz.js?v=37";
 import {
   WearableError, coverageSummary, detectAndNormalize, importSleep, matchToRestPeriods, toActualSleep,
-} from "./wearables.js?v=35";
+} from "./wearables.js?v=37";
 
 /**
  * Floats round-trip through two languages' math libraries; the last bit can differ. Anything the

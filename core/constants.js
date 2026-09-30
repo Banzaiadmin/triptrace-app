@@ -468,6 +468,10 @@ export const STATIONS = Object.freeze({
     "America/Anchorage",
     "US"
   ],
+  "ARN": [
+    "Europe/Stockholm",
+    "SE"
+  ],
   "ATL": [
     "America/New_York",
     "US"
@@ -552,6 +556,10 @@ export const STATIONS = Object.freeze({
     "America/New_York",
     "US"
   ],
+  "BUD": [
+    "Europe/Budapest",
+    "HU"
+  ],
   "BUF": [
     "America/New_York",
     "US"
@@ -588,6 +596,10 @@ export const STATIONS = Object.freeze({
     "Europe/Berlin",
     "DE"
   ],
+  "CGO": [
+    "Asia/Shanghai",
+    "CN"
+  ],
   "CHA": [
     "America/New_York",
     "US"
@@ -619,6 +631,10 @@ export const STATIONS = Object.freeze({
   "CPR": [
     "America/Denver",
     "US"
+  ],
+  "CRK": [
+    "Asia/Manila",
+    "PH"
   ],
   "CRP": [
     "America/Chicago",
@@ -671,6 +687,10 @@ export const STATIONS = Object.freeze({
   "DTW": [
     "America/Detroit",
     "US"
+  ],
+  "DUB": [
+    "Europe/Dublin",
+    "IE"
   ],
   "DWC": [
     "Asia/Dubai",
@@ -864,6 +884,10 @@ export const STATIONS = Object.freeze({
     "Asia/Tokyo",
     "JP"
   ],
+  "KKJ": [
+    "Asia/Tokyo",
+    "JP"
+  ],
   "KOA": [
     "Pacific/Honolulu",
     "US"
@@ -984,6 +1008,10 @@ export const STATIONS = Object.freeze({
     "America/Chicago",
     "US"
   ],
+  "MNL": [
+    "Asia/Manila",
+    "PH"
+  ],
   "MOB": [
     "America/Chicago",
     "US"
@@ -1087,6 +1115,10 @@ export const STATIONS = Object.freeze({
   "PIT": [
     "America/New_York",
     "US"
+  ],
+  "PRG": [
+    "Europe/Prague",
+    "CZ"
   ],
   "PSC": [
     "America/Los_Angeles",
@@ -1224,6 +1256,10 @@ export const STATIONS = Object.freeze({
     "America/Los_Angeles",
     "US"
   ],
+  "SNN": [
+    "Europe/Dublin",
+    "IE"
+  ],
   "SRQ": [
     "America/New_York",
     "US"
@@ -1283,6 +1319,10 @@ export const STATIONS = Object.freeze({
   "TYS": [
     "America/New_York",
     "US"
+  ],
+  "VCE": [
+    "Europe/Rome",
+    "IT"
   ],
   "VCP": [
     "America/Sao_Paulo",
